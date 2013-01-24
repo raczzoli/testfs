@@ -1,0 +1,11 @@
+#ifndef TESTFS_H
+#define TESTFS_H
+
+#define TESTFS_MAGIC_NUM  0x1012F4DD	
+#define TESTFS_SUPER_BLOCK_NUM	1
+#define TESTFS_BLOCK_SIZE	1024
+
+#define TESTFS_ROOT_INODE_NUM   1
+
+
+#endif /* TESTFS_H */
