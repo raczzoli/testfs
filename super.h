@@ -18,7 +18,7 @@ struct testfs_superblock {
  * Entry for each file in the fs, the entire table resides in the itable which
  * is at block number 2 and 3
  */
-struct tesfs_dir_entry {
+struct testfs_dir_entry {
 	__le32 inode_number;	/* Inode number */
 	__le32 block_number;	/* Block number */
 	__le32 size;		/* File size */
