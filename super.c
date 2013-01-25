@@ -43,14 +43,14 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 
 	testfs_sb = kmalloc(sizeof(*testfs_sb), GFP_KERNEL);
 	if (!testfs_sb) {
-		printk(KERN_ERR "testfs: failed to allocate superblock memory\n");
+		printk(KERN_ERR "testfs: failed to allocate sb memory\n");
 		goto err;
 	}
 	memcpy(testfs_sb, bh->b_data, sizeof(*testfs_sb));
 
 	testfs_i = kmalloc(sizeof(*testfs_i), GFP_KERNEL);
 	if (!testfs_i) {
-		printk(KERN_ERR "testfs: failed to allocate filesystem info memory\n");
+		printk(KERN_ERR "testfs: failed to allocate info memory\n");
 		goto err;
 	}
 	memset(testfs_i, 0x00, sizeof(*testfs_i));
@@ -58,7 +58,8 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 	printk(KERN_INFO "testfs: magic=%d block_size=%d "
 		"block_count=%d itable=%d itable_size=%d block_bitmap=%d\n",
 		testfs_sb->magic, testfs_sb->block_size, testfs_sb->block_count,
-		testfs_sb->itable, testfs_sb->itable_size, testfs_sb->block_bitmap);
+		testfs_sb->itable, testfs_sb->itable_size,
+		testfs_sb->block_bitmap);
 
 	/* Check whether valid testfs */
 	if (testfs_sb->magic != TESTFS_MAGIC_NUM) {
@@ -79,7 +80,7 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 	if (!root) 
 	{
 		printk(KERN_ERR "testfs: inode_iget failed in fill_super!\n");
-		goto err;	
+		goto err;
 	}
 	testfs_i->root = root;
 
@@ -114,10 +115,6 @@ static void put_super (struct super_block *sb)
 	if (sb->s_fs_info) {
 		testfs_i = sb->s_fs_info;
 
-		if (testfs_i->root) {
-			iput(testfs_i->root);
-		}
-
 		if (testfs_i->sb) {
 			kfree(testfs_i->sb);
 		}
@@ -128,5 +125,7 @@ static void put_super (struct super_block *sb)
 
 		kfree(sb->s_fs_info);
 	}
+
+	invalidate_bdev(sb->s_bdev);
 }
 

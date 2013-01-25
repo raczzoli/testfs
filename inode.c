@@ -15,7 +15,14 @@ struct inode *inode_iget(struct super_block *sb, unsigned long ino)
 //	struct buffer_head *bh;
 //	long ret = -EIO;
 
-	inode 		= iget_locked(sb, ino);
+	inode = iget_locked(sb, ino);
+	if (!inode) {
+		return ERR_PTR(-ENOMEM);
+	}
+	if (!(inode->i_state & I_NEW)) {
+		/* if inode found return it */
+		return inode;
+	}
 
 	/*
 	raw_inode 	= read_inode(sb, ino, &bh); 
@@ -43,6 +50,8 @@ struct inode *inode_iget(struct super_block *sb, unsigned long ino)
 		inode->i_op     = &testfs_file_iops; // set the inode ops
                 inode->i_fop    = &testfs_file_fops;
 	}
+
+	unlock_new_inode(inode);
 
 	return inode;
 
