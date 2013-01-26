@@ -21,10 +21,14 @@ struct testfs_superblock {
 	uint32_t rootdir_inode;	/* Inode number of the root directory */
 };
 
+struct testfs_inode {
+	uint16_t i_mode;
+	uint16_t i_size;
+	uint32_t block_ptr;
+};
+
 struct tesfs_dir_entry {
 	uint32_t inode_number;	/* Inode number */
-	uint32_t block_number;	/* Block number */
-	uint32_t size;		/* File size */
 	char name[20];		/* File name */
 };
 
@@ -113,17 +117,17 @@ int write_bitmap(void)
 
 int write_itable(void)
 {
-	struct tesfs_dir_entry itable[256] = {0};
+	struct testfs_inode itable[1024] = {0};
 	int c;
 
 	/* Resetting itable with dummy data */
-	for (c = 0; c < 256; c++) {
-		itable[c].inode_number = c;	/* Inode number */
-		itable[c].block_number = c + 4;	/* Block number */
-		itable[c].size = c;		/* File size */
-		itable[c].name[0] = 'F';	/* File name */
-		itable[c].name[1] = 'S';	/* File name */
-		itable[c].name[2] = '\0';	/* File name */
+	for (c = 0; c < 1024; c++) {
+		if (c % 2)
+			itable[c].i_mode = 0x4000;	/* Mode = File */
+		else
+			itable[c].i_mode = 0x8000;	/* Mode = File */
+		itable[c].i_size = c * 4;	/* Size */
+		itable[c].block_ptr = c;	/* Block Pointer */
 	}
 
 	/* Seek to block 2 */
@@ -132,7 +136,7 @@ int write_itable(void)
 		return -1;
 	}
 
-	/* Write block bitmap */
+	/* Write inode table */
 	write(fd, itable, sizeof(itable));
 	printf("Wrote itable : %lu bytes\n", sizeof(itable));
 }
