@@ -3,7 +3,7 @@
 
 #include <linux/fs.h>
 
-/* Testfs superblock */
+/* Testfs superblock read from disk */
 struct testfs_superblock {
 	__le32 magic;		/* Magic number */
 	__le32 block_size;	/* Block size */
@@ -12,6 +12,13 @@ struct testfs_superblock {
 	__le32 itable_size;	/* Size in blocks of inode table */
 	__le32 block_bitmap;	/* Location of block usage bitmap */
 	__le32 rootdir_inode;	/* Inode number of the root directory */
+};
+
+/* Testfs in-memory structure */
+struct testfs_info {
+	struct testfs_superblock *sb;	/* Pointer to on disk structure */
+	struct buffer_head *bh;		/* Pointer to sb buffer head */
+	struct inode *root;		/* Root directory inode */
 };
 
 /**
