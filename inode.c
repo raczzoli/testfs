@@ -55,10 +55,6 @@ struct inode *inode_iget(struct super_block *sb, u32 ino)
 	printk(KERN_INFO "testfs: inode i_mode=%d i_size=%d\n",
 			inode->i_mode, (unsigned int)inode->i_size);
 
-	// this needs to be replaced with raw_inode->i_mode, but until read_inode
-	// works this hardcode lets us at least mount the file system
-	// inode->i_mode = S_IFDIR;
-
 	if (S_ISDIR(inode->i_mode))		/* 16384 */
 	{
 		printk(KERN_INFO "testfs: inode=dir\n");

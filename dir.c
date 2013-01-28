@@ -1,4 +1,7 @@
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
+
+#include "super.h"
 
 static int testfs_create(struct inode *dir, struct dentry *dentry,
 		umode_t mode, bool excl)
@@ -10,8 +13,8 @@ static int testfs_create(struct inode *dir, struct dentry *dentry,
 static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 		unsigned int flags)
 {
-	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
-	return NULL;
+	printk(KERN_INFO "testfs: lookup %s\n", dentry->d_name.name);
+	return ERR_PTR(-EIO);
 }
 
 static int testfs_link(struct dentry *old_dentry, struct inode *dir,
@@ -60,9 +63,24 @@ static int testfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	return 0;
 }
 
-static int testfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
+static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 {
-	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
+	struct inode *dir 	= fp->f_dentry->d_inode;
+
+	printk(KERN_INFO "testfs: pos: %d\n", (int)fp->f_pos);
+
+	if (fp->f_pos == 0) {
+		filldir(dirent, ".", 1, fp->f_pos, dir->i_ino, DT_DIR);
+		fp->f_pos++;
+		return 0;
+	}
+
+        if (fp->f_pos == 1) {
+                filldir(dirent, "..", 2, fp->f_pos, dir->i_ino, DT_DIR);
+		fp->f_pos++;
+                return 0;
+        }
+
 	return 0;
 }
 
@@ -91,4 +109,5 @@ const struct inode_operations testfs_dir_iops = {
 	.mknod		= testfs_mknod,
 	.rename		= testfs_rename,
 };
+
 

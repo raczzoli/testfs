@@ -30,6 +30,7 @@ struct testfs_dir_entry {
 	__le32 block_number;	/* Block number */
 	__le32 size;		/* File size */
 	char name[20];		/* File name */
+	__le32 name_len;	/* File name length */
 };
 
 struct dentry *super_mount(struct file_system_type *fs_type,
