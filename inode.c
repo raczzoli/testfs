@@ -7,16 +7,14 @@
 /*
  * reads the inode from the disk by inode number
  */
-static int read_inode(struct super_block *sb, struct testfs_iloc *iloc,
-		struct testfs_inode *raw_inode);
+static struct testfs_inode *read_inode(struct super_block *sb, struct testfs_iloc *iloc);
 
 struct inode *inode_iget(struct super_block *sb, u32 ino)
 {
 	struct inode *inode;
 	struct testfs_iloc iloc;
-	struct testfs_inode raw_inode;
+	struct testfs_inode *raw_inode;
 	struct testfs_info *testfs_i;
-	int ret = -EIO;
 	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
 	inode = iget_locked(sb, ino);
@@ -38,14 +36,15 @@ struct inode *inode_iget(struct super_block *sb, u32 ino)
 		iloc.block_num, iloc.offset, iloc.ino);
 
 	/* Read raw inode block from disk */
-	ret = read_inode(sb, &iloc, &raw_inode);
-	if (ret) {
+	raw_inode = read_inode(sb, &iloc);
+	if (!raw_inode) {
 		goto err_read_inode;
 	}
 
 	/* Initialize inode */
-	inode->i_mode = le16_to_cpu(raw_inode.i_mode);
-	inode->i_size = le16_to_cpu(raw_inode.i_size);
+	inode->i_mode = le16_to_cpu(raw_inode->i_mode);
+	inode->i_size = le16_to_cpu(raw_inode->i_size);
+	inode->i_private = raw_inode;
 	i_uid_write(inode, 0);
 	i_gid_write(inode, 0);
 	inode->i_atime.tv_sec = (signed)le32_to_cpu(0);
@@ -78,19 +77,17 @@ err_read_inode:
 }
 
 
-static int read_inode(struct super_block *sb, struct testfs_iloc *iloc,
-		struct testfs_inode *raw_inode)
+static struct testfs_inode *read_inode(struct super_block *sb, struct testfs_iloc *iloc)
 {
 	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
 	/* Read block from disk */
 	if (!(iloc->bh = sb_bread(sb, iloc->block_num))) {
 		printk(KERN_INFO "testfs: error reading inode number %d from disk\n", iloc->ino);
-		return -EIO;
+		return ERR_PTR(-EIO);
 	}
 
 	/* Copy inode structure from disk */
-	memcpy(raw_inode, iloc->bh->b_data + iloc->offset, sizeof(*raw_inode));
-	return 0;
+	return (struct testfs_inode *)(iloc->bh->b_data + iloc->offset);
 }
 
