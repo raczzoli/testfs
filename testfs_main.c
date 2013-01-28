@@ -8,10 +8,10 @@
 MODULE_LICENSE("Dual BSD/GPL");
 
 static struct file_system_type testfs_type = {
-  .owner 		= THIS_MODULE,
+	.owner 		= THIS_MODULE,
 	.name		= "testfs",
 	.mount		= super_mount,
-	.kill_sb 	= kill_block_super
+	.kill_sb 	= kill_block_super,
 };
 
 
