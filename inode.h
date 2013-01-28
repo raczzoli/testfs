@@ -3,12 +3,6 @@
 
 #include <linux/fs.h>
 
-
-/* dir.c */
-extern const struct file_operations testfs_dir_fops;
-extern const struct inode_operations testfs_dir_iops;
-
-
 /* file.c */
 extern const struct file_operations testfs_file_fops;
 extern const struct inode_operations testfs_file_iops;

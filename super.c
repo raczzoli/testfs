@@ -22,6 +22,7 @@ static struct super_operations testfs_super_ops = {
 struct dentry *super_mount(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
+	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 	return mount_bdev(fs_type, flags, dev_name, data, fill_super);
 }
 
@@ -33,7 +34,8 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 	struct testfs_superblock *testfs_sb = NULL;
 	struct testfs_info *testfs_i = NULL;
 	int ret = -1;
-	
+	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
+
         if (!(bh = sb_bread(sb, TESTFS_SUPER_BLOCK_NUM)))
 	{
 		printk(KERN_ERR "testfs: unable to read superblock.\n");
@@ -111,6 +113,7 @@ err:
 static void put_super (struct super_block *sb)
 {
 	struct testfs_info *testfs_i = NULL;
+	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
 	if (sb->s_fs_info) {
 		testfs_i = sb->s_fs_info;
