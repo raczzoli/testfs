@@ -1,6 +1,7 @@
 #include <linux/buffer_head.h>
 
 #include "inode.h"
+#include "dir.h"
 #include "super.h"
 
 /*
@@ -16,6 +17,7 @@ struct inode *inode_iget(struct super_block *sb, u32 ino)
 	struct testfs_inode raw_inode;
 	struct testfs_info *testfs_i;
 	int ret = -EIO;
+	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
 	inode = iget_locked(sb, ino);
 	if (!inode) {
@@ -83,6 +85,8 @@ err_read_inode:
 static int read_inode(struct super_block *sb, struct testfs_iloc *iloc,
 		struct testfs_inode *raw_inode)
 {
+	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
+
 	/* Read block from disk */
 	if (!(iloc->bh = sb_bread(sb, iloc->block_num))) {
 		printk(KERN_INFO "testfs: error reading inode number %d from disk\n", iloc->ino);
