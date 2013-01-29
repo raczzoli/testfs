@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <string.h>
 
 /* Commands :
  * $dd if=/dev/zero of=loopback.img bs=1024 count=204800
@@ -153,22 +154,22 @@ int write_rootdir(void)
 	int c;
 
 	root[0].inode_number = 1;	/* Inode number */
-	root[0].name_len = 20;		/* Name length */
+	root[0].name_len = 1;		/* Name length */
 	root[0].name[0] = '.';
 	root[0].name[1] = '\0';
 	root[0].type = 1;		/* DT_DIR or DT_REG */
 
 	root[1].inode_number = 1;	/* Inode number */
-	root[1].name_len = 20;		/* Name length */
+	root[1].name_len = 2;		/* Name length */
 	root[1].name[0] = '.';
 	root[1].name[1] = '.';
 	root[1].name[2] = '\0';
 	root[1].type = 1;		/* DT_DIR or DT_REG */
 
 	for (c = 2; c < 5; c++) {
-		root[c].inode_number = c;	/* Inode number */
-		root[c].name_len = 20;		/* Name length */
+		root[c].inode_number = c;				/* Inode number */
 		snprintf(root[c].name, sizeof(root[c].name), "testdir%d", c);
+		root[c].name_len = (uint32_t)strlen(root[c].name);      /* Name length */
 		root[c].type = 1;		/* DT_DIR or DT_REG */
 	}
 
