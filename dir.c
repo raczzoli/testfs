@@ -75,30 +75,38 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 	struct buffer_head *bh  		= NULL;
 	struct inode *dir 			= fp->f_dentry->d_inode;
 	struct super_block* sb 			= dir->i_sb;
-	int data_block_num			= 0; 
+	int data_block_num			= 0;
+	int isize				= 0;
 	struct testfs_dir_entry *raw_dentry 	= NULL;
+	printk(KERN_INFO "testfs: readdir file pos = %lu\n", (unsigned long)fp->f_pos);
 
-	if (fp->f_pos == 0) {
-		filldir(dirent, ".", 1, fp->f_pos, dir->i_ino, DT_DIR);
-		fp->f_pos++;
-		return 0;
-	}
+	// EXT3 keeps the . and .. entry on disk
+	//if (fp->f_pos == 0) {
+	//	filldir(dirent, ".", 1, fp->f_pos, dir->i_ino, DT_DIR);
+	//	fp->f_pos++;
+	//	return 0;
+	//}
 
-        if (fp->f_pos == 1) {
-                filldir(dirent, "..", 2, fp->f_pos, dir->i_ino, DT_DIR);
-		fp->f_pos++;
-                return 0;
-        }
+        //if (fp->f_pos == 1) {
+        //        filldir(dirent, "..", 2, fp->f_pos, dir->i_ino, DT_DIR);
+	//	fp->f_pos++;
+        //        return 0;
+        //}
 
 	/*
 	 * data block number containing entries for the current directory 
 	 */
 	data_block_num = inode_get_data_block_num(dir);
+	isize = inode_get_size(dir);
+	printk(KERN_INFO "testfs: data block number = %d size = %d\n", data_block_num, isize);
+	if (fp->f_pos >= isize) {
+		return 0;
+	}
 
 	/* something like this should never happen. if the inodes are properly written to disk
 	 * block_ptr will point to a valid data block
 	 */
-	if (data_block_num < 1)
+	if (data_block_num < 4)
 	{
 		printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
 		return 0;
@@ -114,15 +122,20 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 	 * we have to decrement fp->f_pos by 2. After we start listing entries from 
 	 * the disk, fp->f_pos will be incremented by sizeof(struct testfs_dir_entry);
 	 */
-	raw_dentry = (struct testfs_dir_entry *)(bh->b_data + (fp->f_pos - 2));
+	raw_dentry = (struct testfs_dir_entry *)bh->b_data;
 
-	while (1) {
-		if (raw_dentry->inode_number == 0)
-			break;
+	while (fp->f_pos < isize) {
+		//if (raw_dentry->inode_number == 0)
+		//	break;
 	
+		printk(KERN_INFO "testfs: %s %d\n", raw_dentry->name, raw_dentry->name_len);
 		filldir(dirent, raw_dentry->name, raw_dentry->name_len, fp->f_pos, le32_to_cpu(raw_dentry->inode_number), raw_dentry->type);
 		fp->f_pos += sizeof(struct testfs_dir_entry);
-	}	
+		raw_dentry++;
+		printk(KERN_INFO "testfs: next dir entry fpos=%lu\n", (unsigned long)fp->f_pos);
+	}
+
+	printk(KERN_INFO "testfs: fpos2=%lu\n", (unsigned long)fp->f_pos);
 
 	return 0;
 }

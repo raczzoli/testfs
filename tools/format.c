@@ -27,9 +27,11 @@ struct testfs_inode {
 	uint32_t block_ptr;
 };
 
-struct tesfs_dir_entry {
+struct testfs_dir_entry {
 	uint32_t inode_number;	/* Inode number */
+	uint32_t name_len;	/* File name length */
 	char name[20];		/* File name */
+	uint8_t type;		/* DT_DIR or DT_REG */
 };
 
 int main(int argc, char *argv[])
@@ -56,6 +58,10 @@ int main(int argc, char *argv[])
 	}
 
 	if (write_itable() < 0) {
+		goto err;
+	}
+
+	if (write_rootdir() < 0) {
 		goto err;
 	}
 
@@ -123,11 +129,11 @@ int write_itable(void)
 	/* Resetting itable with dummy data */
 	for (c = 0; c < 1024; c++) {
 		if (c % 2)
-			itable[c].i_mode = 0x4000;	/* Mode = File */
+			itable[c].i_mode = 0x4000;	/* Mode = Dir */
 		else
 			itable[c].i_mode = 0x8000;	/* Mode = File */
-		itable[c].i_size = c * 4;	/* Size */
-		itable[c].block_ptr = c;	/* Block Pointer */
+		itable[c].i_size = 160;			/* Size */
+		itable[c].block_ptr = c + 4;		/* Block Pointer */
 	}
 
 	/* Seek to block 2 */
@@ -139,5 +145,41 @@ int write_itable(void)
 	/* Write inode table */
 	write(fd, itable, sizeof(itable));
 	printf("Wrote itable : %lu bytes\n", sizeof(itable));
+}
+
+int write_rootdir(void)
+{
+	struct testfs_dir_entry root[5];
+	int c;
+
+	root[0].inode_number = 1;	/* Inode number */
+	root[0].name_len = 20;		/* Name length */
+	root[0].name[0] = '.';
+	root[0].name[1] = '\0';
+	root[0].type = 1;		/* DT_DIR or DT_REG */
+
+	root[1].inode_number = 1;	/* Inode number */
+	root[1].name_len = 20;		/* Name length */
+	root[1].name[0] = '.';
+	root[1].name[1] = '.';
+	root[1].name[2] = '\0';
+	root[1].type = 1;		/* DT_DIR or DT_REG */
+
+	for (c = 2; c < 5; c++) {
+		root[c].inode_number = c;	/* Inode number */
+		root[c].name_len = 20;		/* Name length */
+		snprintf(root[c].name, sizeof(root[c].name), "testdir%d", c);
+		root[c].type = 1;		/* DT_DIR or DT_REG */
+	}
+
+	/* Seek to block 5 (1 + 4) */
+	if (lseek(fd, 5 * 4096, 0) < 0) {
+		perror("Failed to seek to root directory data block");
+		return -1;
+	}
+
+	/* Write root directory data block */
+	write(fd, root, sizeof(root));
+	printf("Wrote root directory data : %lu bytes\n", sizeof(root));
 }
 
