@@ -24,4 +24,6 @@ struct testfs_iloc {
 
 struct inode *inode_iget(struct super_block *sb, u32 ino);
 
+int inode_get_data_block_num(struct inode *inode);
+
 #endif /* INODE_H */

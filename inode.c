@@ -91,3 +91,20 @@ static struct testfs_inode *read_inode(struct super_block *sb, struct testfs_ilo
 	return (struct testfs_inode *)(iloc->bh->b_data + iloc->offset);
 }
 
+
+int inode_get_data_block_num(struct inode *inode)
+{
+	struct testfs_inode *raw_inode 		= (struct testfs_inode *)inode->i_private;
+	struct testfs_info *testfs_info		= (struct testfs_info *)inode->i_sb->s_fs_info;
+	struct testfs_superblock *sb		= testfs_info->sb;
+
+	/*
+	 * we are checking if raw_inode is pointing to a valid data block number
+	 */
+	if (raw_inode->block_ptr < (sb->itable + sb->itable_size)) {
+		printk(KERN_INFO "testfs: invalid data block number %d\n ", raw_inode->block_ptr);
+		return -1;
+	}
+
+	return raw_inode->block_ptr;
+}
