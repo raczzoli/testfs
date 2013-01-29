@@ -108,3 +108,11 @@ int inode_get_data_block_num(struct inode *inode)
 
 	return raw_inode->block_ptr;
 }
+
+int inode_get_size(struct inode *inode)
+{
+	struct testfs_inode *raw_inode 		= (struct testfs_inode *)inode->i_private;
+
+	return le16_to_cpu(raw_inode->i_size);
+}
+
