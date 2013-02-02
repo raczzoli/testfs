@@ -26,7 +26,8 @@ struct dentry *super_mount(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data);
 
 /*
- * searches for the next free data block, stores the found block in block_num and returns
+ * searches for the next free data block, stores the found block in block_num,
+ * marks it as used, and returns
  */
 inline int super_get_free_data_block_num(struct super_block *sb, int *block_num);
 	
