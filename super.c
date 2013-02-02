@@ -56,7 +56,20 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 		goto err;
 	}
 	memset(testfs_i, 0x00, sizeof(*testfs_i));
+	testfs_i->block_bitmap = kmalloc(testfs_sb->block_size, GFP_KERNEL);
 
+	if (!testfs_i->block_bitmap) {
+		printk(KERN_ERR "testfs: failed to allocate memory for data block bitmap\n");
+		goto err;
+	}
+	
+	if (!(bh = sb_bread(sb, testfs_sb->block_bitmap)))
+	{
+		printk(KERN_ERR "testfs: unable to read data block bitmap from disk.\n");
+		goto err;
+	}
+	memcpy(testfs_i->block_bitmap, bh->b_data, testfs_sb->block_size);
+	
 	printk(KERN_INFO "testfs: magic=%d block_size=%d "
 		"block_count=%d itable=%d itable_size=%d block_bitmap=%d\n",
 		testfs_sb->magic, testfs_sb->block_size, testfs_sb->block_count,
@@ -99,8 +112,11 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 err:
 	if (root)
         	iput(root);
-	if (testfs_i)
+	if (testfs_i) {
+		if (testfs_i->block_bitmap)
+			kfree(testfs_i->block_bitmap);
 		kfree(testfs_i);
+	}
 	if (testfs_sb)
 		kfree(testfs_sb);
 	if (bh)
@@ -135,7 +151,6 @@ static void put_super (struct super_block *sb)
 
 inline int super_get_free_data_block_num(struct super_block *sb, int *block_num)
 {
-	struct buffer_head *bh				= NULL;
 	struct testfs_info *testfs_info		= (struct testfs_info *)sb->s_fs_info;
 	struct testfs_superblock *testfs_sb	= testfs_info->sb;
 
@@ -143,14 +158,9 @@ inline int super_get_free_data_block_num(struct super_block *sb, int *block_num)
 	int mask					= 0x80;
 	int block_size 				= testfs_sb->block_size;
 	int first_data_block_num 	= testfs_sb->itable + testfs_sb->itable_size;
-	
-	if (!(bh = sb_bread(sb, testfs_sb->block_bitmap))) {
-		printk(KERN_INFO "testfs: error reading data block bitmap from disk\n");
-		return -EIO;
-	}
 
 	for (i=0;i<block_size;i++) {
-		byte = bh->b_data[i];
+		byte = testfs_info->block_bitmap[i];
 		for (bit=0;bit<7;bit++) {
 			byte = byte << (bit == 0 ? 0 : 1);
 			if ((byte & mask) < 1) {
@@ -159,12 +169,10 @@ inline int super_get_free_data_block_num(struct super_block *sb, int *block_num)
 		}
 	}
 
-	brelse(bh);
 	return -1;
 	
 block_found:
 	*block_num = ((i+1) * bit) + first_data_block_num;
-	brelse(bh);
 	return 0;
 }
 

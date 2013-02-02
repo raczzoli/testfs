@@ -19,6 +19,7 @@ struct testfs_info {
 	struct testfs_superblock *sb;	/* Pointer to on disk structure */
 	struct buffer_head *bh;		/* Pointer to sb buffer head */
 	struct inode *root;		/* Root directory inode */
+	char *block_bitmap;		/* Pointer to on disk block bitmap */
 };
 
 struct dentry *super_mount(struct file_system_type *fs_type,
