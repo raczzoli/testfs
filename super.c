@@ -83,7 +83,7 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 		printk(KERN_ERR "testfs: unable to read inode bitmap from disk.\n");
 		goto err;
 	}
-	memcpy(testfs_i->block_bitmap, bh->b_data, testfs_sb->block_size);
+	memcpy(testfs_i->inode_bitmap, bh->b_data, testfs_sb->block_size);
 	
 	printk(KERN_INFO "testfs: magic=%d block_size=%d "
 		"block_count=%d itable=%d itable_size=%d block_bitmap=%d\n",
@@ -171,9 +171,9 @@ inline int super_get_free_data_block_num(struct super_block *sb, int *block_num)
 {
 	struct testfs_info *testfs_info		= (struct testfs_info *)sb->s_fs_info;
 	struct testfs_superblock *testfs_sb	= testfs_info->sb;
-	int data_block_num 					= testfs_sb->itable + testfs_sb->itable_size;
+	int start_block_num					= testfs_sb->itable + testfs_sb->itable_size;
 	
-	return get_free_bit_from_bitmap(sb, testfs_info->block_bitmap, data_block_num, block_num);
+	return get_free_bit_from_bitmap(sb, testfs_info->block_bitmap, start_block_num, block_num);
 }
 
 
@@ -194,7 +194,8 @@ static inline int get_free_bit_from_bitmap(struct super_block *sb, char *bitmap,
 	int i,bit,byte				= 0;
 	int mask					= 0x80;
 	int block_size 				= testfs_sb->block_size;
-
+	int block_counter			= 0;
+	
 	for (i=0;i<block_size;i++) {
 		byte = bitmap[i];
 		for (bit=0;bit<7;bit++) {
@@ -204,13 +205,14 @@ static inline int get_free_bit_from_bitmap(struct super_block *sb, char *bitmap,
 				bitmap[i] = bitmap[i] ^ (mask >> bit);
 				goto block_found;
 			}
+			block_counter++;
 		}
 	}
 
 	return -1;
 	
 block_found:
-	*num = ((i+1) * bit) + start_pos;
+	*num = block_counter + start_pos;
 	return 0;
 
 }
