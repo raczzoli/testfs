@@ -9,6 +9,7 @@
  */
 static struct testfs_inode *read_inode(struct super_block *sb, struct testfs_iloc *iloc);
 
+
 struct inode *inode_iget(struct super_block *sb, u32 ino)
 {
 	struct inode *inode;
@@ -115,4 +116,7 @@ int inode_get_size(struct inode *inode)
 
 	return le16_to_cpu(raw_inode->i_size);
 }
+
+
+
 
