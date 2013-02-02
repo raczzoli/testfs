@@ -32,7 +32,6 @@ struct dentry *super_mount(struct file_system_type *fs_type,
 
 static int fill_super(struct super_block *sb, void *data, int silent)
 {
-	int test_block_num = 0;
 	struct buffer_head *bh 	= NULL;
 	struct inode *root  = NULL;
 	struct testfs_superblock *testfs_sb = NULL;
@@ -123,7 +122,15 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 
 	printk(KERN_INFO "testfs: mounted testfs file system\n");
 
-		
+	/*
+	if (super_get_free_data_block_num(sb, &test_block_num) == 0)
+		printk(KERN_INFO "testfs: found free data block: %d\n", test_block_num);
+	*/
+	
+	if (super_get_free_inode_num(sb, &test_block_num) == 0)
+		printk(KERN_INFO "testfs: found free inode number: %d\n", test_block_num);
+	
+	
 	return 0;
 
 err:
