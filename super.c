@@ -106,7 +106,7 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	printk(KERN_INFO "testfs: mounted testfs file system\n");
-
+	
 	return 0;
 
 err:
@@ -164,6 +164,8 @@ inline int super_get_free_data_block_num(struct super_block *sb, int *block_num)
 		for (bit=0;bit<7;bit++) {
 			byte = byte << (bit == 0 ? 0 : 1);
 			if ((byte & mask) < 1) {
+				/* we found the first free data block, so we mark it as used */
+				testfs_info->block_bitmap[i] = testfs_info->block_bitmap[i] ^ (mask >> bit);
 				goto block_found;
 			}
 		}
