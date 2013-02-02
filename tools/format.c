@@ -19,6 +19,7 @@ struct testfs_superblock {
 	uint32_t itable;	/* Block number of inode table */
 	uint32_t itable_size;	/* Size in blocks of inode table */
 	uint32_t block_bitmap;	/* Location of block usage bitmap */
+	uint32_t inode_bitmap;	/* Location of inode bitmap */
 	uint32_t rootdir_inode;	/* Inode number of the root directory */
 };
 
@@ -54,7 +55,11 @@ int main(int argc, char *argv[])
 		goto err;
 	}
 
-	if (write_bitmap() < 0) {
+	if (write_block_bitmap() < 0) {
+		goto err;
+	}
+
+	if (write_inode_bitmap() < 0) {
 		goto err;
 	}
 
@@ -77,12 +82,13 @@ int write_super(void)
 {
 	struct testfs_superblock sb;
 
-	sb.magic	= 0x1012F4DD;
+	sb.magic		= 0x1012F4DD;
 	sb.block_size	= 4096;
 	sb.block_count	= 32768;
-	sb.itable	= 2;
+	sb.itable	= 3;
 	sb.itable_size	= 2;	
 	sb.block_bitmap = 1;
+	sb.inode_bitmap = 2;
 	sb.rootdir_inode = 1;
 
 	/* Seek to block 0 */
@@ -98,7 +104,7 @@ int write_super(void)
 	return 0;
 }
 
-int write_bitmap(void)
+int write_block_bitmap(void)
 {
 	unsigned char bitmap[4096] = {0};
 	int c;
@@ -108,12 +114,41 @@ int write_bitmap(void)
 		bitmap[c] = 0x00;
 	}
 
-	/* Marking 1st 4 blocks in use by superblock, bitmap, itable */
-	bitmap[0] = 0x0F;
+	/* Marking 1st 5 blocks in use by superblock, block bitmap, inode bitmap, itable */
+	
+	/* zoli: If we want to mark the first X bytes as used, becuase of the big/little endian thing
+	 * we need to invert the order of 1s and 0s. So if we want to mark the first 5 blocks as used
+	 * we need to write it as 0xF8 = 11111000 not 0x1F = 00011111
+	 */
+	bitmap[0] = 0xF8;
 
 	/* Seek to block 1 */
 	if (lseek(fd, 1 * 4096, 0) < 0) {
 		perror("Failed to seek to block bitmap");
+		return -1;
+	}
+
+	/* Write block bitmap */
+	write(fd, bitmap, sizeof(bitmap));
+	printf("Wrote block bitmap : %lu bytes\n", sizeof(bitmap));
+}
+
+int write_inode_bitmap(void)
+{
+	unsigned char bitmap[4096] = {0};
+	int c;
+
+	/* Resetting bitmap to dummy data */
+	for (c = 0; c < sizeof(bitmap); c++) {
+		bitmap[c] = 0x00;
+	}
+
+	/* Marking 1st 4 inodes in use by ".","..", and the 3 test dirs */
+	bitmap[0] = 0xF0;
+
+	/* Seek to block 2 */
+	if (lseek(fd, 2 * 4096, 0) < 0) {
+		perror("Failed to seek to inode bitmap");
 		return -1;
 	}
 
@@ -137,8 +172,8 @@ int write_itable(void)
 		itable[c].block_ptr = c + 4;		/* Block Pointer */
 	}
 
-	/* Seek to block 2 */
-	if (lseek(fd, 2 * 4096, 0) < 0) {
+	/* Seek to block 3 */
+	if (lseek(fd, 3 * 4096, 0) < 0) {
 		perror("Failed to seek to itable");
 		return -1;
 	}
@@ -173,7 +208,7 @@ int write_rootdir(void)
 		root[c].type = 1;		/* DT_DIR or DT_REG */
 	}
 
-	/* Seek to block 5 (1 + 4) */
+	/* Seek to block 6 (1 + 6) */
 	if (lseek(fd, 5 * 4096, 0) < 0) {
 		perror("Failed to seek to root directory data block");
 		return -1;
