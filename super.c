@@ -13,6 +13,9 @@ static int fill_super(struct super_block *sb, void *data, int silent);
 // super operations
 static void put_super(struct super_block *);
 
+// checks for the next free bit in bitmap (used for block and inode bitmaps)
+static inline int get_free_bit_from_bitmap(struct super_block *sb, char *bitmap, int start_pos, int *num);
+
 
 static struct super_operations testfs_super_ops = {
 	.put_super 	= put_super
@@ -29,6 +32,7 @@ struct dentry *super_mount(struct file_system_type *fs_type,
 
 static int fill_super(struct super_block *sb, void *data, int silent)
 {
+	int test_block_num = 0;
 	struct buffer_head *bh 	= NULL;
 	struct inode *root  = NULL;
 	struct testfs_superblock *testfs_sb = NULL;
@@ -57,15 +61,27 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 	}
 	memset(testfs_i, 0x00, sizeof(*testfs_i));
 	testfs_i->block_bitmap = kmalloc(testfs_sb->block_size, GFP_KERNEL);
+	testfs_i->inode_bitmap = kmalloc(testfs_sb->block_size, GFP_KERNEL);
 
 	if (!testfs_i->block_bitmap) {
 		printk(KERN_ERR "testfs: failed to allocate memory for data block bitmap\n");
+		goto err;
+	}
+	if (!testfs_i->inode_bitmap) {
+		printk(KERN_ERR "testfs: failed to allocate memory for inode bitmap\n");
 		goto err;
 	}
 	
 	if (!(bh = sb_bread(sb, testfs_sb->block_bitmap)))
 	{
 		printk(KERN_ERR "testfs: unable to read data block bitmap from disk.\n");
+		goto err;
+	}
+	memcpy(testfs_i->block_bitmap, bh->b_data, testfs_sb->block_size);
+
+	if (!(bh = sb_bread(sb, testfs_sb->inode_bitmap)))
+	{
+		printk(KERN_ERR "testfs: unable to read inode bitmap from disk.\n");
 		goto err;
 	}
 	memcpy(testfs_i->block_bitmap, bh->b_data, testfs_sb->block_size);
@@ -106,7 +122,8 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	printk(KERN_INFO "testfs: mounted testfs file system\n");
-	
+
+		
 	return 0;
 
 err:
@@ -115,6 +132,9 @@ err:
 	if (testfs_i) {
 		if (testfs_i->block_bitmap)
 			kfree(testfs_i->block_bitmap);
+		if (testfs_i->inode_bitmap)
+			kfree(testfs_i->inode_bitmap);
+
 		kfree(testfs_i);
 	}
 	if (testfs_sb)
@@ -153,19 +173,37 @@ inline int super_get_free_data_block_num(struct super_block *sb, int *block_num)
 {
 	struct testfs_info *testfs_info		= (struct testfs_info *)sb->s_fs_info;
 	struct testfs_superblock *testfs_sb	= testfs_info->sb;
+	int data_block_num 					= testfs_sb->itable + testfs_sb->itable_size;
+	
+	return get_free_bit_from_bitmap(sb, testfs_info->block_bitmap, data_block_num, block_num);
+}
+
+
+inline int super_get_free_inode_num(struct super_block *sb, int *inode_num)
+{
+	struct testfs_info *testfs_info		= (struct testfs_info *)sb->s_fs_info;
+	struct testfs_superblock *testfs_sb	= testfs_info->sb;
+	
+	return get_free_bit_from_bitmap(sb, testfs_info->inode_bitmap, testfs_sb->itable, inode_num);
+}
+
+
+static inline int get_free_bit_from_bitmap(struct super_block *sb, char *bitmap, int start_pos, int *num)
+{
+	struct testfs_info *testfs_info		= (struct testfs_info *)sb->s_fs_info;
+	struct testfs_superblock *testfs_sb	= testfs_info->sb;
 
 	int i,bit,byte				= 0;
 	int mask					= 0x80;
 	int block_size 				= testfs_sb->block_size;
-	int first_data_block_num 	= testfs_sb->itable + testfs_sb->itable_size;
 
 	for (i=0;i<block_size;i++) {
-		byte = testfs_info->block_bitmap[i];
+		byte = bitmap[i];
 		for (bit=0;bit<7;bit++) {
 			byte = byte << (bit == 0 ? 0 : 1);
 			if ((byte & mask) < 1) {
-				/* we found the first free data block, so we mark it as used */
-				testfs_info->block_bitmap[i] = testfs_info->block_bitmap[i] ^ (mask >> bit);
+				/* we found the first free block, so we mark it as used */
+				bitmap[i] = bitmap[i] ^ (mask >> bit);
 				goto block_found;
 			}
 		}
@@ -174,7 +212,7 @@ inline int super_get_free_data_block_num(struct super_block *sb, int *block_num)
 	return -1;
 	
 block_found:
-	*block_num = ((i+1) * bit) + first_data_block_num;
+	*num = ((i+1) * bit) + start_pos;
 	return 0;
-}
 
+}

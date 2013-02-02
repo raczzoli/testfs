@@ -11,6 +11,7 @@ struct testfs_superblock {
 	__le32 itable;		/* Block number of inode table */
 	__le32 itable_size;	/* Size in blocks of inode table */
 	__le32 block_bitmap;	/* Location of block usage bitmap */
+	__le32 inode_bitmap;	/* Location of inode bitmap */
 	__le32 rootdir_inode;	/* Inode number of the root directory */
 };
 
@@ -20,6 +21,7 @@ struct testfs_info {
 	struct buffer_head *bh;		/* Pointer to sb buffer head */
 	struct inode *root;		/* Root directory inode */
 	char *block_bitmap;		/* Pointer to on disk block bitmap */
+	char *inode_bitmap;		/* Pointer to on disk inode bitmap */
 };
 
 struct dentry *super_mount(struct file_system_type *fs_type,
@@ -30,6 +32,12 @@ struct dentry *super_mount(struct file_system_type *fs_type,
  * marks it as used, and returns
  */
 inline int super_get_free_data_block_num(struct super_block *sb, int *block_num);
+
+/*
+ * searches for the next free inode, stores the found number in inode_num,
+ * marks it as used, and returns
+ */
+inline int super_get_free_inode_num(struct super_block *sb, int *inode_num);
 	
 	
 #endif /* SUPER_H */
