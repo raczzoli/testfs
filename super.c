@@ -36,11 +36,11 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 	int ret = -1;
 	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
-        if (!(bh = sb_bread(sb, TESTFS_SUPER_BLOCK_NUM)))
+    if (!(bh = sb_bread(sb, TESTFS_SUPER_BLOCK_NUM)))
 	{
 		printk(KERN_ERR "testfs: unable to read superblock.\n");
-               	goto err;
-       	}
+		goto err;
+	}
 	printk(KERN_INFO "testfs: superblock read successfuly.\n");
 
 	testfs_sb = kmalloc(sizeof(*testfs_sb), GFP_KERNEL);
@@ -130,5 +130,41 @@ static void put_super (struct super_block *sb)
 	}
 
 	invalidate_bdev(sb->s_bdev);
+}
+
+
+inline int super_get_free_data_block_num(struct super_block *sb, int *block_num)
+{
+	struct buffer_head *bh				= NULL;
+	struct testfs_info *testfs_info		= (struct testfs_info *)sb->s_fs_info;
+	struct testfs_superblock *testfs_sb	= testfs_info->sb;
+
+	int i,bit,byte				= 0;
+	int mask					= 0x80;
+	int block_size 				= testfs_sb->block_size;
+	int first_data_block_num 	= testfs_sb->itable + testfs_sb->itable_size;
+	
+	if (!(bh = sb_bread(sb, testfs_sb->block_bitmap))) {
+		printk(KERN_INFO "testfs: error reading data block bitmap from disk\n");
+		return -EIO;
+	}
+
+	for (i=0;i<block_size;i++) {
+		byte = bh->b_data[i];
+		for (bit=0;bit<7;bit++) {
+			byte = byte << (bit == 0 ? 0 : 1);
+			if ((byte & mask) < 1) {
+				goto block_found;
+			}
+		}
+	}
+
+	brelse(bh);
+	return -1;
+	
+block_found:
+	*block_num = ((i+1) * bit) + first_data_block_num;
+	brelse(bh);
+	return 0;
 }
 
