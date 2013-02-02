@@ -21,16 +21,16 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct buffer_head *bh			= NULL;
 	struct inode *found_inode		= NULL;
 
+
 	if (data_block_num < 4) {
-                printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
-                return ERR_PTR(-EIO);
-        }
+			printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
+			return ERR_PTR(-EIO);
+	}
 
-        if (!(bh = sb_bread(dir->i_sb, data_block_num))) {
-                printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
-                return ERR_PTR(-EIO);
-        }	
-
+	if (!(bh = sb_bread(dir->i_sb, data_block_num))) {
+			printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
+			return ERR_PTR(-EIO);
+	}	
 
 	raw_dentry = (struct testfs_dir_entry *)bh->b_data;	
 	for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(dir->i_sb); raw_dentry++) 
@@ -109,13 +109,13 @@ static int testfs_rename(struct inode *old_dir, struct dentry *old_dentry,
  */
 static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 {
-	struct buffer_head *bh  		= NULL;
+	struct buffer_head *bh  	= NULL;
 	struct inode *dir 			= fp->f_dentry->d_inode;
-	struct super_block* sb 			= dir->i_sb;
+	struct super_block* sb 		= dir->i_sb;
 	int data_block_num			= 0;
-	int isize				= 0;
+	int isize					= 0;
 	struct testfs_dir_entry *raw_dentry 	= NULL;
-
+	
 	/*
 	 * data block number containing entries for the current directory 
 	 */
