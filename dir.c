@@ -1,5 +1,6 @@
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
+#include <linux/slab.h>
 
 #include "testfs.h"
 #include "dir.h"
@@ -20,7 +21,7 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct testfs_dir_entry *raw_dentry 	= NULL;
 	struct buffer_head *bh			= NULL;
 	struct inode *found_inode		= NULL;
-
+	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
 	if (data_block_num < 4) {
 			printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
@@ -84,7 +85,42 @@ static int testfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 
 static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
+	int data_block_num 			= inode_get_data_block_num(dir);
+	struct testfs_dir_entry *raw_dentry 	= NULL;
+	struct buffer_head *bh			= NULL;
+	unsigned char *buffer;
+	int bufptr = 0;		/* Buffer to hold the dir data block minus the directory name */
+	int dir_found = 0;
 	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
+
+	buffer = (unsigned char *)kzalloc(TESTFS_GET_BLOCK_SIZE(dir->i_sb), GFP_KERNEL);
+
+	if (data_block_num < 4) {
+			printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
+			return -EIO;
+	}
+
+	if (!(bh = sb_bread(dir->i_sb, data_block_num))) {
+			printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
+			return -EIO;
+	}
+
+	bufptr = 0;
+	raw_dentry = (struct testfs_dir_entry *)bh->b_data;
+	for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(dir->i_sb); raw_dentry++) {
+		if (strcmp(dentry->d_name.name, raw_dentry->name) == 0) {
+			dir_found = 1;
+			continue;
+		}
+		memcpy(buffer + bufptr, raw_dentry, sizeof(*raw_dentry));
+		bufptr += sizeof(*raw_dentry);
+	}
+	brelse(bh);
+
+	/* TODO : write the directory buffer to disk and mark inode as unused */
+	if (dir_found == 1) {
+	}
+
 	return 0;
 }
 
@@ -115,7 +151,8 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 	int data_block_num			= 0;
 	int isize					= 0;
 	struct testfs_dir_entry *raw_dentry 	= NULL;
-	
+	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
+
 	/*
 	 * data block number containing entries for the current directory 
 	 */
@@ -159,7 +196,7 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 
 static int testfs_release(struct inode *inode, struct file *filp)
 {
-//	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
+	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 	return 0;
 }
 
@@ -182,5 +219,4 @@ const struct inode_operations testfs_dir_iops = {
 	.mknod		= testfs_mknod,
 	.rename		= testfs_rename,
 };
-
 

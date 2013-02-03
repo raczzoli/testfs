@@ -152,9 +152,9 @@ int write_inode_bitmap(void)
 		return -1;
 	}
 
-	/* Write block bitmap */
+	/* Write inode bitmap */
 	write(fd, bitmap, sizeof(bitmap));
-	printf("Wrote block bitmap : %lu bytes\n", sizeof(bitmap));
+	printf("Wrote inode bitmap : %lu bytes\n", sizeof(bitmap));
 }
 
 int write_itable(void)
