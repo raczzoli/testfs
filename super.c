@@ -39,7 +39,7 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 	int ret = -1;
 	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
-    if (!(bh = sb_bread(sb, TESTFS_SUPER_BLOCK_NUM)))
+    	if (!(bh = sb_bread(sb, TESTFS_SUPER_BLOCK_NUM)))
 	{
 		printk(KERN_ERR "testfs: unable to read superblock.\n");
 		goto err;
@@ -186,13 +186,49 @@ inline int super_get_free_inode_num(struct super_block *sb, int *inode_num)
 }
 
 
+inline int super_free_data_block_num(struct super_block *sb, int block_num)
+{
+	struct testfs_info *testfs_info         = (struct testfs_info *)sb->s_fs_info;
+        struct testfs_superblock *testfs_sb     = testfs_info->sb;
+        int start_block_num                     = testfs_sb->itable + testfs_sb->itable_size;
+
+	int mask  = 0x80;
+	int block = (block_num - start_block_num);
+	int byte  = (block / 8);  
+	int bit   = block % 8;
+
+	testfs_info->block_bitmap[byte] = testfs_info->block_bitmap[byte] ^ (mask >> bit);
+
+	return 0;
+}
+
+
+inline int super_free_inode_num(struct super_block *sb, int inode_num)
+{
+        struct testfs_info *testfs_info         = (struct testfs_info *)sb->s_fs_info;
+        struct testfs_superblock *testfs_sb     = testfs_info->sb;
+	int start_inode_num			= testfs_sb->itable;
+
+        int mask  = 0x80;
+        int block = (inode_num - start_inode_num);
+        int byte  = (block / 8);
+        int bit   = block % 8;
+
+        testfs_info->inode_bitmap[byte] = testfs_info->inode_bitmap[byte] ^ (mask >> bit);
+
+        return 0;
+}
+
+
+
+
 static inline int get_free_bit_from_bitmap(struct super_block *sb, char *bitmap, int start_pos, int *num)
 {
 	struct testfs_info *testfs_info		= (struct testfs_info *)sb->s_fs_info;
 	struct testfs_superblock *testfs_sb	= testfs_info->sb;
 
 	int i,bit,byte				= 0;
-	int mask					= 0x80;
+	int mask				= 0x80;
 	int block_size 				= testfs_sb->block_size;
 	int block_counter			= 0;
 	
