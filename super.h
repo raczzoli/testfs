@@ -26,30 +26,6 @@ struct testfs_info {
 
 struct dentry *super_mount(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data);
-
-/*
- * searches for the next free data block, stores the found block in block_num,
- * marks it as used, and returns
- */
-inline int super_get_free_data_block_num(struct super_block *sb, int *block_num);
-
-/*
- * searches for the next free inode, stores the found number in inode_num,
- * marks it as used, and returns
- */
-inline int super_get_free_inode_num(struct super_block *sb, int *inode_num);
-
-
-/*
- * marks the passed block_num as free in the data block bitmap
- */
-inline int super_free_data_block_num(struct super_block *sb, int block_num);
-
-
-/*
- * marks the passed inode_num as free in the inode block bitmap
- */
-inline int super_free_inode_num(struct super_block *sb, int inode_num);
 	
 	
 #endif /* SUPER_H */
