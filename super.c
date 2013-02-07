@@ -5,7 +5,7 @@
 #include "testfs.h"
 #include "super.h"
 #include "inode.h"
-
+#include "bitmap.h"
 
 // fill super
 static int fill_super(struct super_block *sb, void *data, int silent);
@@ -15,7 +15,7 @@ static void put_super(struct super_block *);
 
 
 static struct super_operations testfs_super_ops = {
-	.put_super 	= put_super
+	.put_super 	= put_super,
 };
 
 
@@ -139,6 +139,7 @@ err:
 
 	return ret;
 }
+
 
 
 static void put_super (struct super_block *sb)

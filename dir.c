@@ -2,6 +2,7 @@
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
 
+
 #include "testfs.h"
 #include "dir.h"
 #include "super.h"
@@ -21,7 +22,6 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct testfs_dir_entry *raw_dentry 	= NULL;
 	struct buffer_head *bh			= NULL;
 	struct inode *found_inode		= NULL;
-	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
 	if (data_block_num < 4) {
 			printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
@@ -54,7 +54,7 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 	}
 	
 	brelse(bh);
-	return ERR_PTR(-EIO);
+	return 0;
 }
 
 static int testfs_link(struct dentry *old_dentry, struct inode *dir,
@@ -77,9 +77,59 @@ static int testfs_symlink(struct inode *dir, struct dentry *dentry,
 	return 0;
 }
 
-static int testfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
+static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t mode)
 {
-	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
+	int data_block_num	= 0;
+	struct inode *new_dir 	= NULL;
+	struct buffer_head *bh 	= NULL;
+	int free_inode_found	= 0;
+	struct testfs_dir_entry *raw_dentry = NULL;
+
+	// request new inode
+	new_dir = inode_get_new_inode(parent_dir->i_sb, mode);
+
+	if (!new_dir) 
+		return -ENOSPC;
+
+	d_instantiate(dentry, parent_dir);	
+
+	data_block_num = inode_get_data_block_num(parent_dir);	
+	if (data_block_num < 4) {
+                printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
+                return -EIO;
+        }
+
+	if (!(bh = sb_bread(parent_dir->i_sb, data_block_num))) {
+                printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
+                return -EIO;
+        }
+
+        raw_dentry = (struct testfs_dir_entry *)bh->b_data;
+        for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(parent_dir->i_sb); raw_dentry++) {
+		if (raw_dentry->inode_number == 0) {
+			//we found an empty inode
+			free_inode_found = 1;
+			break;
+		}
+        }
+		
+	if (!free_inode_found)
+		return -ENOSPC;
+
+	raw_dentry->inode_number = cpu_to_le32(new_dir->i_ino);
+	raw_dentry->type	 = new_dir->i_mode;
+
+	raw_dentry->name_len = dentry->d_name.len;
+	memcpy(raw_dentry->name, dentry->d_name.name, dentry->d_name.len);
+
+	((struct testfs_inode *)parent_dir->i_private)->i_size += sizeof(struct testfs_dir_entry);
+
+	mark_buffer_dirty(bh);
+	mark_inode_dirty(parent_dir);
+
+	fsync_bdev(parent_dir->i_sb->s_bdev);
+
+	brelse(bh);
 	return 0;
 }
 
@@ -96,13 +146,13 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	buffer = (unsigned char *)kzalloc(TESTFS_GET_BLOCK_SIZE(dir->i_sb), GFP_KERNEL);
 
 	if (data_block_num < 4) {
-			printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
-			return -EIO;
+		printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
+		return -EIO;
 	}
 
 	if (!(bh = sb_bread(dir->i_sb, data_block_num))) {
-			printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
-			return -EIO;
+		printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
+		return -EIO;
 	}
 
 	bufptr = 0;
@@ -145,13 +195,12 @@ static int testfs_rename(struct inode *old_dir, struct dentry *old_dentry,
  */
 static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 {
-	struct buffer_head *bh  	= NULL;
+	struct buffer_head *bh  		= NULL;
 	struct inode *dir 			= fp->f_dentry->d_inode;
-	struct super_block* sb 		= dir->i_sb;
+	struct super_block* sb 			= dir->i_sb;
 	int data_block_num			= 0;
-	int isize					= 0;
+	int isize				= 0;
 	struct testfs_dir_entry *raw_dentry 	= NULL;
-	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
 	/*
 	 * data block number containing entries for the current directory 
@@ -182,12 +231,14 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 	 * the disk, fp->f_pos will be incremented by sizeof(struct testfs_dir_entry);
 	 */
 	raw_dentry = (struct testfs_dir_entry *)bh->b_data;
-
 	while (fp->f_pos < isize) {
 		filldir(dirent, raw_dentry->name, raw_dentry->name_len, fp->f_pos, raw_dentry->inode_number, raw_dentry->type);
 		fp->f_pos += sizeof(struct testfs_dir_entry);
 		raw_dentry++;
 	}
+
+	raw_dentry++;
+	printk(KERN_INFO "testfs: next name: %s\n", raw_dentry->name);
 
 	printk(KERN_INFO "testfs: fpos2=%lu\n", (unsigned long)fp->f_pos);
 

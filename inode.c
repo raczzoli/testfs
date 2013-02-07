@@ -1,13 +1,23 @@
 #include <linux/buffer_head.h>
+#include <linux/slab.h>
 
 #include "inode.h"
 #include "dir.h"
 #include "super.h"
+#include "bitmap.h"
+
+
 
 /*
  * reads the inode from the disk by inode number
  */
 static struct testfs_inode *read_inode(struct super_block *sb, struct testfs_iloc *iloc);
+
+/*
+ * fills the inode with data from raw_inode. raw_inode can be read from the disk,
+ * or instantiated programatically if the inode is new
+ */
+static int fill_inode(struct super_block *sb, struct inode *inode, struct testfs_inode *raw_inode);
 
 
 struct inode *inode_iget(struct super_block *sb, u32 ino)
@@ -41,32 +51,8 @@ struct inode *inode_iget(struct super_block *sb, u32 ino)
 	if (!raw_inode) {
 		goto err_read_inode;
 	}
-
-	/* Initialize inode */
-	inode->i_mode = le16_to_cpu(raw_inode->i_mode);
-	inode->i_size = le16_to_cpu(raw_inode->i_size);
-	inode->i_private = raw_inode;
-	i_uid_write(inode, 0);
-	i_gid_write(inode, 0);
-	inode->i_atime.tv_sec = (signed)le32_to_cpu(0);
-	inode->i_ctime.tv_sec = (signed)le32_to_cpu(0);
-	inode->i_mtime.tv_sec = (signed)le32_to_cpu(0);
-	inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_mtime.tv_nsec = 0;
-	printk(KERN_INFO "testfs: inode i_mode=%d i_size=%d\n",
-			inode->i_mode, (unsigned int)inode->i_size);
-
-	if (S_ISDIR(inode->i_mode))		/* 16384 */
-	{
-		printk(KERN_INFO "testfs: inode=dir\n");
-		inode->i_op     = &testfs_dir_iops; // set the inode ops	
-		inode->i_fop    = &testfs_dir_fops;
-	}
-	else if (S_ISREG(inode->i_mode))	/* 32768 */
-	{
-		printk(KERN_INFO "testfs: inode=file\n");
-		inode->i_op     = &testfs_file_iops; // set the inode ops
-                inode->i_fop    = &testfs_file_fops;
-	}
+	inode->i_ino = ino;
+	fill_inode(sb, inode, raw_inode);
 
 	unlock_new_inode(inode);
 
@@ -75,6 +61,71 @@ struct inode *inode_iget(struct super_block *sb, u32 ino)
 err_read_inode:
 	brelse(iloc.bh);
 	return NULL;
+}
+
+
+struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
+{
+	struct inode *new_ino	 		= NULL;
+	int new_inode_num 			= 0;
+	struct testfs_inode *testfs_inode	= NULL;
+
+	if (bitmap_get_free_inode_num(sb, &new_inode_num) != 0){
+		printk(KERN_INFO "testfs: No more free inodes left!\n");
+		return NULL;
+	}
+
+	testfs_inode = kmalloc(sizeof(*testfs_inode), GFP_KERNEL);
+        if (!testfs_inode) {
+                printk(KERN_INFO "testfs: Error allocating memory testfs_inode object!\n");
+                return NULL;
+        }
+	
+	new_ino = new_inode(sb);
+	if (!new_ino) {
+		printk(KERN_INFO "testfs: Error allocating new vfs inode!\n");
+		return NULL;
+	}
+
+	testfs_inode->i_mode 	= mode;	
+	new_ino->i_ino 		= new_inode_num;
+
+	fill_inode(sb, new_ino, testfs_inode);
+
+	return new_ino;
+}
+
+
+
+static int fill_inode(struct super_block *sb, struct inode *inode, struct testfs_inode *raw_inode)
+{
+        /* Initialize inode */
+        inode->i_mode = le16_to_cpu(raw_inode->i_mode);
+        inode->i_size = le16_to_cpu(raw_inode->i_size);
+        inode->i_private = raw_inode;
+        i_uid_write(inode, 0);
+        i_gid_write(inode, 0);
+        inode->i_atime.tv_sec = (signed)le32_to_cpu(0);
+        inode->i_ctime.tv_sec = (signed)le32_to_cpu(0);
+        inode->i_mtime.tv_sec = (signed)le32_to_cpu(0);
+        inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_mtime.tv_nsec = 0;
+        printk(KERN_INFO "testfs: inode i_mode=%d i_size=%d\n",
+                        inode->i_mode, (unsigned int)inode->i_size);
+
+        if (S_ISDIR(inode->i_mode))             /* 16384 */
+        {
+                printk(KERN_INFO "testfs: inode=dir\n");
+                inode->i_op     = &testfs_dir_iops; // set the inode ops
+                inode->i_fop    = &testfs_dir_fops;
+        }
+        else if (S_ISREG(inode->i_mode))        /* 32768 */
+        {
+                printk(KERN_INFO "testfs: inode=file\n");
+                inode->i_op     = &testfs_file_iops; // set the inode ops
+                inode->i_fop    = &testfs_file_fops;
+        }
+
+	return 0;
 }
 
 
