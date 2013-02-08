@@ -7,6 +7,7 @@
 #include "dir.h"
 #include "super.h"
 #include "inode.h"
+#include "bitmap.h"
 
 static int testfs_create(struct inode *dir, struct dentry *dentry,
 		umode_t mode, bool excl)
@@ -141,9 +142,14 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	unsigned char *buffer;
 	int bufptr = 0;		/* Buffer to hold the dir data block minus the directory name */
 	int dir_found = 0;
+	int inode_num = 0;
 	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
 	buffer = (unsigned char *)kzalloc(TESTFS_GET_BLOCK_SIZE(dir->i_sb), GFP_KERNEL);
+	if (!buffer) {
+		printk(KERN_INFO "testfs: failed to allocate temporary buffer\n");
+		return -EIO;
+	}
 
 	if (data_block_num < 4) {
 		printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
@@ -160,17 +166,23 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(dir->i_sb); raw_dentry++) {
 		if (strcmp(dentry->d_name.name, raw_dentry->name) == 0) {
 			dir_found = 1;
+			inode_num = raw_dentry->inode_number;
 			continue;
 		}
 		memcpy(buffer + bufptr, raw_dentry, sizeof(*raw_dentry));
 		bufptr += sizeof(*raw_dentry);
 	}
-	brelse(bh);
 
 	/* TODO : write the directory buffer to disk and mark inode as unused */
 	if (dir_found == 1) {
+		memcpy(raw_dentry, buffer, TESTFS_GET_BLOCK_SIZE(dir->i_sb));
+		bitmap_free_inode_num(dir->i_sb, inode_num);
+		mark_buffer_dirty(bh);
+		fsync_bdev(dir->i_sb->s_bdev);
 	}
+	kfree(buffer);
 
+	brelse(bh);
 	return 0;
 }
 
