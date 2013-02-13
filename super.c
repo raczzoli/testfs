@@ -16,6 +16,7 @@ static void put_super(struct super_block *);
 
 static struct super_operations testfs_super_ops = {
 	.put_super 	= put_super,
+	.write_inode	= inode_write_inode
 };
 
 
@@ -163,4 +164,5 @@ static void put_super (struct super_block *sb)
 
 	invalidate_bdev(sb->s_bdev);
 }
+
 
