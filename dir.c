@@ -141,8 +141,7 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	struct buffer_head *bh			= NULL;
 	unsigned char *buffer;
 	int bufptr = 0;		/* Buffer to hold the dir data block minus the directory name */
-	int dir_found = 0;
-	int inode_num = 0;
+
 	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 
 	buffer = (unsigned char *)kzalloc(TESTFS_GET_BLOCK_SIZE(dir->i_sb), GFP_KERNEL);
@@ -165,22 +164,18 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	raw_dentry = (struct testfs_dir_entry *)bh->b_data;
 	for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(dir->i_sb); raw_dentry++) {
 		if (strcmp(dentry->d_name.name, raw_dentry->name) == 0) {
-			dir_found = 1;
-			inode_num = raw_dentry->inode_number;
-			continue;
-		}
-		memcpy(buffer + bufptr, raw_dentry, sizeof(*raw_dentry));
-		bufptr += sizeof(*raw_dentry);
-	}
+			bitmap_free_inode_num(dir->i_sb, raw_dentry->inode_number);
+			raw_dentry->inode_number = 0;
+			memset(raw_dentry->name,0x00,raw_dentry->name_len);
+			raw_dentry->name_len = 0;
 
-	/* TODO : write the directory buffer to disk and mark inode as unused */
-	if (dir_found == 1) {
-		memcpy(raw_dentry, buffer, TESTFS_GET_BLOCK_SIZE(dir->i_sb));
-		bitmap_free_inode_num(dir->i_sb, inode_num);
-		mark_buffer_dirty(bh);
-		fsync_bdev(dir->i_sb->s_bdev);
+			((struct testfs_inode *)dir->i_private)->i_size -= sizeof(struct testfs_dir_entry);             
+
+	                mark_inode_dirty(dir);
+        	        mark_buffer_dirty(bh);
+        	        fsync_bdev(dir->i_sb->s_bdev);
+		}
 	}
-	kfree(buffer);
 
 	brelse(bh);
 	return 0;
@@ -244,15 +239,13 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 	 */
 	raw_dentry = (struct testfs_dir_entry *)bh->b_data;
 	while (fp->f_pos < isize) {
-		filldir(dirent, raw_dentry->name, raw_dentry->name_len, fp->f_pos, raw_dentry->inode_number, raw_dentry->type);
-		fp->f_pos += sizeof(struct testfs_dir_entry);
+		if (raw_dentry->inode_number > 0)
+		{
+			filldir(dirent, raw_dentry->name, raw_dentry->name_len, fp->f_pos, raw_dentry->inode_number, raw_dentry->type);
+			fp->f_pos += sizeof(struct testfs_dir_entry);
+		}
 		raw_dentry++;
 	}
-
-	raw_dentry++;
-	printk(KERN_INFO "testfs: next name: %s\n", raw_dentry->name);
-
-	printk(KERN_INFO "testfs: fpos2=%lu\n", (unsigned long)fp->f_pos);
 
 	return 0;
 }
