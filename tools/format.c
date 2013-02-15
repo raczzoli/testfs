@@ -165,9 +165,9 @@ int write_itable(void)
 	/* Resetting itable with dummy data */
 	for (c = 0; c < 1024; c++) {
 		if (c % 2)
-			itable[c].i_mode = 0x4000;	/* Mode = Dir */
+			itable[c].i_mode = 0x41FF;	/* Mode = Dir */
 		else
-			itable[c].i_mode = 0x8000;	/* Mode = File */
+			itable[c].i_mode = 0x81FF;	/* Mode = File */
 		itable[c].i_size = 160;			/* Size */
 		itable[c].block_ptr = c + 4;		/* Block Pointer */
 	}
