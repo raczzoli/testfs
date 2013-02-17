@@ -27,8 +27,6 @@ struct inode *inode_iget(struct super_block *sb, u32 ino)
 	struct testfs_iloc iloc;
 	struct testfs_inode *raw_inode;
 
-	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
-
 	inode = iget_locked(sb, ino);
 	if (!inode) {
 		return ERR_PTR(-ENOMEM);
@@ -68,7 +66,13 @@ struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
 		printk(KERN_INFO "testfs: No more free inodes left!\n");
 		return NULL;
 	}
-
+/*
+	new_ino = iget_locked(sb, new_inode_num);
+        if (!new_ino) {
+		printk(KERN_INFO "testfs: inode_get_new_inode: new_ino = NULL\n");
+                return ERR_PTR(-ENOMEM);
+        }
+*/
 	testfs_inode = kmalloc(sizeof(*testfs_inode), GFP_KERNEL);
         if (!testfs_inode) {
                 printk(KERN_INFO "testfs: Error allocating memory testfs_inode object!\n");
@@ -82,9 +86,16 @@ struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
 	}
 
 	testfs_inode->i_mode 	= mode;	
-	new_ino->i_ino 		= new_inode_num;
+	
+	if (bitmap_get_free_data_block_num(sb, &testfs_inode->block_ptr) != 0) {
+		printk(KERN_INFO "testfs: Error allocating data block for new inode!\n");
+		return NULL;
+	}
 
+	new_ino->i_ino 		= new_inode_num;
 	fill_inode(sb, new_ino, testfs_inode);
+
+//	unlock_new_inode(new_ino);
 
 	return new_ino;
 }
@@ -103,8 +114,6 @@ static int fill_inode(struct super_block *sb, struct inode *inode, struct testfs
         inode->i_ctime.tv_sec = (signed)le32_to_cpu(0);
         inode->i_mtime.tv_sec = (signed)le32_to_cpu(0);
         inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_mtime.tv_nsec = 0;
-        printk(KERN_INFO "testfs: inode i_mode=%d i_size=%d\n",
-                        inode->i_mode, (unsigned int)inode->i_size);
 
         if (S_ISDIR(inode->i_mode))             /* 16384 */
         {
@@ -131,8 +140,6 @@ static int fill_iloc_by_inode_num(struct super_block *sb, u32 ino, struct testfs
                 ((ino * sizeof(struct testfs_inode)) / sb->s_blocksize);
         iloc->offset = (ino * sizeof(struct testfs_inode)) % sb->s_blocksize;
         iloc->ino = ino;
-        printk(KERN_INFO "testfs: inode block_num=%d offset=%d ino=%d\n",
-                iloc->block_num, iloc->offset, iloc->ino);
 
 	return 0;
 }
@@ -156,17 +163,19 @@ int inode_write_inode(struct inode *inode, struct writeback_control *wbc)
 	struct testfs_iloc iloc;
         struct testfs_inode *raw_inode = NULL;
 
-	printk(KERN_INFO "testfs: inode_write_inode called");
+	printk(KERN_INFO "testfs: write inode - size: %d\n", ((struct testfs_inode *)inode->i_private)->i_size);
 
 	fill_iloc_by_inode_num(inode->i_sb, inode->i_ino, &iloc);
 	raw_inode = read_inode(inode->i_sb, &iloc);
 
-	if (!raw_inode)
-	{
+	if (!raw_inode) {
 		return -EIO;
 	}
 
 	raw_inode->i_size = inode_get_size(inode);
+	raw_inode->i_mode = inode->i_mode;
+
+	printk(KERN_INFO "testfs: !!!!!!!!!!!!!!!! writing inode: number: %lu, size: %d, type: %d\n", inode->i_ino, (int)inode->i_size, raw_inode->i_mode);
 
 	mark_buffer_dirty(iloc.bh);
 
