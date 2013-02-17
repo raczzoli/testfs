@@ -163,13 +163,17 @@ int write_itable(void)
 	int c;
 
 	/* Resetting itable with dummy data */
-	for (c = 0; c < 1024; c++) {
-		if (c % 2)
+	for (c = 1; c <= 1024; c++) {
+		if (c == 1) {
+			itable[c].i_mode 	= 0x41FF;
+			itable[c].i_size 	= 2 * sizeof(struct testfs_dir_entry);
+			itable[c].block_ptr 	= c + 4;
+		}
+		else {		
 			itable[c].i_mode = 0x41FF;	/* Mode = Dir */
-		else
-			itable[c].i_mode = 0x81FF;	/* Mode = File */
-		itable[c].i_size = 160;			/* Size */
-		itable[c].block_ptr = c + 4;		/* Block Pointer */
+			itable[c].i_size = 0;		/* Size */
+			itable[c].block_ptr = 0;	/* Block Pointer */
+		}
 	}
 
 	/* Seek to block 3 */
@@ -185,7 +189,7 @@ int write_itable(void)
 
 int write_rootdir(void)
 {
-	struct testfs_dir_entry root[5];
+	struct testfs_dir_entry root[2];
 	int c;
 
 	root[0].inode_number = 1;	/* Inode number */
@@ -201,12 +205,12 @@ int write_rootdir(void)
 	root[1].name[2] = '\0';
 	root[1].type = 1;		/* DT_DIR or DT_REG */
 
-	for (c = 2; c < 5; c++) {
-		root[c].inode_number = c;				/* Inode number */
-		snprintf(root[c].name, sizeof(root[c].name), "testdir%d", c);
-		root[c].name_len = (uint32_t)strlen(root[c].name);      /* Name length */
-		root[c].type = 1;		/* DT_DIR or DT_REG */
-	}
+//	for (c = 2; c < 5; c++) {
+//		root[c].inode_number = c;				/* Inode number */
+//		snprintf(root[c].name, sizeof(root[c].name), "testdir%d", c);
+//		root[c].name_len = (uint32_t)strlen(root[c].name);      /* Name length */
+//		root[c].type = 1;		/* DT_DIR or DT_REG */
+//	}
 
 	/* Seek to block 6 (1 + 6) */
 	if (lseek(fd, 5 * 4096, 0) < 0) {
