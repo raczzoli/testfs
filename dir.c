@@ -88,7 +88,7 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	struct testfs_dir_entry *raw_dentry = NULL;
 
 	// request new inode
-	new_dir = inode_get_new_inode(parent_dir->i_sb, mode);
+	new_dir = inode_get_new_inode(parent_dir->i_sb, S_IFDIR | mode);
 
 	if (!new_dir) 
 		return -ENOSPC;
