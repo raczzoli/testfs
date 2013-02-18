@@ -66,25 +66,25 @@ struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
 		printk(KERN_INFO "testfs: No more free inodes left!\n");
 		return NULL;
 	}
-/*
+
 	new_ino = iget_locked(sb, new_inode_num);
         if (!new_ino) {
 		printk(KERN_INFO "testfs: inode_get_new_inode: new_ino = NULL\n");
                 return ERR_PTR(-ENOMEM);
         }
-*/
+
 	testfs_inode = kmalloc(sizeof(*testfs_inode), GFP_KERNEL);
         if (!testfs_inode) {
                 printk(KERN_INFO "testfs: Error allocating memory testfs_inode object!\n");
                 return NULL;
         }
-	
+/*	
 	new_ino = new_inode(sb);
 	if (!new_ino) {
 		printk(KERN_INFO "testfs: Error allocating new vfs inode!\n");
 		return NULL;
 	}
-
+*/
 	testfs_inode->i_mode 	= mode;	
 	
 	if (bitmap_get_free_data_block_num(sb, &testfs_inode->block_ptr) != 0) {
@@ -95,7 +95,7 @@ struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
 	new_ino->i_ino 		= new_inode_num;
 	fill_inode(sb, new_ino, testfs_inode);
 
-//	unlock_new_inode(new_ino);
+	unlock_new_inode(new_ino);
 
 	return new_ino;
 }
