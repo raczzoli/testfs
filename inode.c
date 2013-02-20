@@ -157,8 +157,6 @@ int inode_write_inode(struct inode *inode, struct writeback_control *wbc)
 	struct testfs_iloc iloc;
         struct testfs_inode *raw_inode = NULL;
 
-	printk(KERN_INFO "testfs: write inode - size: %d\n", ((struct testfs_inode *)inode->i_private)->i_size);
-
 	fill_iloc_by_inode_num(inode->i_sb, inode->i_ino, &iloc);
 	raw_inode = read_inode(inode->i_sb, &iloc);
 
@@ -166,10 +164,9 @@ int inode_write_inode(struct inode *inode, struct writeback_control *wbc)
 		return -EIO;
 	}
 
-	raw_inode->i_size = inode_get_size(inode);
-	raw_inode->i_mode = inode->i_mode;
-
-	printk(KERN_INFO "testfs: !!!!!!!!!!!!!!!! writing inode: number: %lu, size: %d, type: %d\n", inode->i_ino, (int)inode->i_size, raw_inode->i_mode);
+	raw_inode->i_size 	= inode_get_size(inode);
+	raw_inode->i_mode 	= inode->i_mode;
+	raw_inode->block_ptr 	= ((struct testfs_inode *)inode->i_private)->block_ptr;
 
 	mark_buffer_dirty(iloc.bh);
 
