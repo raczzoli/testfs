@@ -25,7 +25,7 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct inode *found_inode		= NULL;
 
 	if (data_block_num < 4) {
-			printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
+			printk(KERN_INFO "testfs: lookup: invalid data block number for directory entry %s.\n", dentry->d_name.name);
 			return ERR_PTR(-EIO);
 	}
 
@@ -97,7 +97,7 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 
 	data_block_num = inode_get_data_block_num(parent_dir);	
 	if (data_block_num < 4) {
-                printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
+                printk(KERN_INFO "testfs: mkdir(parent dir): invalid data block number for directory entry %s.\n", dentry->d_name.name);
                 return -EIO;
         }
 
@@ -108,7 +108,7 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	
 	data_block_num = inode_get_data_block_num(new_dir);
 	if (data_block_num < 4) {
-                printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
+                printk(KERN_INFO "testfs: mkdir(new dir): invalid data block number for directory entry %s.\n", dentry->d_name.name);
 		brelse(bh);
                 return -EIO;
         }
@@ -142,6 +142,7 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 
 	((struct testfs_inode *)parent_dir->i_private)->i_size 	+= sizeof(struct testfs_dir_entry);
 	((struct testfs_inode *)new_dir->i_private)->i_size 	= sizeof(struct testfs_dir_entry) * 2;
+	((struct testfs_inode *)new_dir->i_private)->block_ptr	= data_block_num;
 
 	raw_dentry = (struct testfs_dir_entry *)new_dir_bh->b_data;
 	memcpy(raw_dentry->name, ".", 1);
@@ -151,9 +152,9 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	raw_dentry++;
 	
 	memcpy(raw_dentry->name, "..", 2);
-	raw_dentry->name_len 	= 2;
-	raw_dentry->type	= 1;
-	raw_dentry->inode_number = parent_dir->i_ino;
+	raw_dentry->name_len 		= 2;
+	raw_dentry->type		= 1;
+	raw_dentry->inode_number 	= parent_dir->i_ino;
 
 	mark_buffer_dirty(new_dir_bh);
 	mark_inode_dirty(new_dir);
@@ -183,7 +184,7 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	}
 
 	if (data_block_num < 4) {
-		printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
+		printk(KERN_INFO "testfs: rmdir: invalid data block number for directory entry %s.\n", dentry->d_name.name);
 		return -EIO;
 	}
 
@@ -258,7 +259,7 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 	 * block_ptr will point to a valid data block
 	 */
 	if (data_block_num < 4) {
-		printk(KERN_INFO "testfs: invalid data block number for directory entry.\n");
+		printk(KERN_INFO "testfs: readdir: invalid data block number for directory entry %s.\n", fp->f_dentry->d_name.name);
 		return 0;
 	}
 
