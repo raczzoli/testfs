@@ -150,8 +150,6 @@ static void write_super(struct super_block *sb)
 	struct testfs_info *testfs_i		= sb->s_fs_info;
 	struct testfs_superblock *testfs_sb     = testfs_i->sb;
 
-	printk(KERN_INFO "testfs: writing dirty super block...\n");
-
         if (!(inode_bmp_bh = sb_bread(sb, testfs_sb->inode_bitmap)))
         {
                 printk(KERN_ERR "testfs: unable to read inode bitmap from disk.\n");
@@ -169,6 +167,8 @@ static void write_super(struct super_block *sb)
 
 	mark_buffer_dirty(inode_bmp_bh);
 	mark_buffer_dirty(block_bmp_bh);
+
+	sb->s_dirt = 0;
 
 	brelse(inode_bmp_bh);
 	brelse(block_bmp_bh);
