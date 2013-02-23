@@ -163,17 +163,18 @@ int write_itable(void)
 	int c;
 
 	/* Resetting itable with dummy data */
-	for (c = 1; c <= 1024; c++) {
+	for (c = 0; c < 1024; c++) {
 		if (c == 1) {
 			itable[c].i_mode 	= 0x41FF;
 			itable[c].i_size 	= 2 * sizeof(struct testfs_dir_entry);
 			itable[c].block_ptr 	= c + 4;
 		}
 		else {		
-			itable[c].i_mode = 0x41FF;	/* Mode = Dir */
-			itable[c].i_size = 0;		/* Size */
-			itable[c].block_ptr = 0;	/* Block Pointer */
+			itable[c].i_mode 	= 0x41FF;	/* Mode = Dir */
+			itable[c].i_size 	= 0;		/* Size */
+			itable[c].block_ptr 	= 0;	/* Block Pointer */
 		}
+
 	}
 
 	/* Seek to block 3 */
