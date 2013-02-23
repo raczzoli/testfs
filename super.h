@@ -17,11 +17,13 @@ struct testfs_superblock {
 
 /* Testfs in-memory structure */
 struct testfs_info {
-	struct testfs_superblock *sb;	/* Pointer to on disk structure */
-	struct buffer_head *bh;		/* Pointer to sb buffer head */
-	struct inode *root;		/* Root directory inode */
-	char *block_bitmap;		/* Pointer to on disk block bitmap */
-	char *inode_bitmap;		/* Pointer to on disk inode bitmap */
+	struct testfs_superblock *sb;		/* Pointer to on disk structure */
+	struct buffer_head *bh;			/* Pointer to sb buffer head */
+	struct inode *root;			/* Root directory inode */
+//	char *block_bitmap;			/* Pointer to on disk block bitmap */
+//	char *inode_bitmap;			/* Pointer to on disk inode bitmap */
+	struct buffer_head *block_bmp_bh;	/* Block bitmap buffer head */
+	struct buffer_head *inode_bmp_bh;	/* Inode bitmap buffer head */
 };
 
 struct dentry *super_mount(struct file_system_type *fs_type,

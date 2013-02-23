@@ -12,12 +12,12 @@ static int fill_super(struct super_block *sb, void *data, int silent);
 
 // super operations
 static void put_super(struct super_block *);
-static void write_super(struct super_block *sb);
+//static void write_super(struct super_block *sb);
 
 static struct super_operations testfs_super_ops = {
 	.put_super 	= put_super,
 	.write_inode	= inode_write_inode,
-	.write_super	= write_super
+//	.write_super	= write_super
 };
 
 
@@ -58,31 +58,18 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 		goto err;
 	}
 	memset(testfs_i, 0x00, sizeof(*testfs_i));
-	testfs_i->block_bitmap = kmalloc(testfs_sb->block_size, GFP_KERNEL);
-	testfs_i->inode_bitmap = kmalloc(testfs_sb->block_size, GFP_KERNEL);
-
-	if (!testfs_i->block_bitmap) {
-		printk(KERN_ERR "testfs: failed to allocate memory for data block bitmap\n");
-		goto err;
-	}
-	if (!testfs_i->inode_bitmap) {
-		printk(KERN_ERR "testfs: failed to allocate memory for inode bitmap\n");
-		goto err;
-	}
 	
-	if (!(bh = sb_bread(sb, testfs_sb->block_bitmap)))
+	if (!(testfs_i->block_bmp_bh = sb_bread(sb, testfs_sb->block_bitmap)))
 	{
 		printk(KERN_ERR "testfs: unable to read data block bitmap from disk.\n");
 		goto err;
 	}
-	memcpy(testfs_i->block_bitmap, bh->b_data, testfs_sb->block_size);
 
-	if (!(bh = sb_bread(sb, testfs_sb->inode_bitmap)))
+	if (!(testfs_i->inode_bmp_bh = sb_bread(sb, testfs_sb->inode_bitmap)))
 	{
 		printk(KERN_ERR "testfs: unable to read inode bitmap from disk.\n");
 		goto err;
 	}
-	memcpy(testfs_i->inode_bitmap, bh->b_data, testfs_sb->block_size);
 	
 	printk(KERN_INFO "testfs: magic=%d block_size=%d "
 		"block_count=%d itable=%d itable_size=%d block_bitmap=%d\n",
@@ -127,11 +114,10 @@ err:
 	if (root)
         	iput(root);
 	if (testfs_i) {
-		if (testfs_i->block_bitmap)
-			kfree(testfs_i->block_bitmap);
-		if (testfs_i->inode_bitmap)
-			kfree(testfs_i->inode_bitmap);
-
+		if (testfs_i->block_bmp_bh)
+			brelse(testfs_i->block_bmp_bh);
+		if (testfs_i->inode_bmp_bh)
+			brelse(testfs_i->inode_bmp_bh);
 		kfree(testfs_i);
 	}
 	if (testfs_sb)
@@ -142,7 +128,7 @@ err:
 	return ret;
 }
 
-
+/*
 static void write_super(struct super_block *sb)
 {
 	struct buffer_head *inode_bmp_bh 	= NULL;
@@ -173,6 +159,7 @@ static void write_super(struct super_block *sb)
 	brelse(inode_bmp_bh);
 	brelse(block_bmp_bh);
 }
+*/
 
 
 static void put_super (struct super_block *sb)
