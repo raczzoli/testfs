@@ -140,6 +140,8 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	raw_dentry->name_len	= dentry->d_name.len;
 	memcpy(raw_dentry->name, dentry->d_name.name, dentry->d_name.len);
 
+	printk(KERN_INFO "testfs: raw_dentry name: %s, length: %d\n", raw_dentry->name, raw_dentry->name_len);
+
 	((struct testfs_inode *)parent_dir->i_private)->i_size 	+= sizeof(struct testfs_dir_entry);
 	((struct testfs_inode *)new_dir->i_private)->i_size 	= sizeof(struct testfs_dir_entry) * 2;
 	((struct testfs_inode *)new_dir->i_private)->block_ptr	= data_block_num;
