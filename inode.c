@@ -1,5 +1,6 @@
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
+#include <linux/quotaops.h>
 
 #include "inode.h"
 #include "dir.h"
@@ -58,6 +59,7 @@ err_read_inode:
 
 struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
 {
+	int err					= 0;
 	struct inode *new_ino	 		= NULL;
 	int new_inode_num 			= 0;
 	struct testfs_inode *testfs_inode	= NULL;
@@ -67,11 +69,27 @@ struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
 		return NULL;
 	}
 
-	new_ino = iget_locked(sb, new_inode_num);
+	//new_ino = iget_locked(sb, new_inode_num);
+	new_ino = new_inode(sb);
         if (!new_ino) {
 		printk(KERN_INFO "testfs: inode_get_new_inode: new_ino = NULL\n");
                 return ERR_PTR(-ENOMEM);
         }
+
+	if (insert_inode_locked(new_ino) < 0) {
+		printk(KERN_INFO "testfs: inode allocated twice!\n");
+		iput(new_ino);
+		return ERR_PTR(-EIO);
+	}
+
+	dquot_initialize(new_ino);
+	err = dquot_alloc_inode(new_ino);
+	if (err) {
+		dquot_drop(new_ino);
+		unlock_new_inode(new_ino);
+		iput(new_ino);
+		return ERR_PTR(err);
+	}
 
 	testfs_inode = kmalloc(sizeof(*testfs_inode), GFP_KERNEL);
         if (!testfs_inode) {
@@ -85,9 +103,11 @@ struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
 		printk(KERN_INFO "testfs: Error allocating data block for new inode!\n");
 		return NULL;
 	}
-
-	new_ino->i_ino 		= new_inode_num;
+	
+	new_ino->i_ino = new_inode_num;
 	fill_inode(sb, new_ino, testfs_inode);
+
+	insert_inode_hash(new_ino);
 
 	unlock_new_inode(new_ino);
 
@@ -111,13 +131,11 @@ static int fill_inode(struct super_block *sb, struct inode *inode, struct testfs
 
         if (S_ISDIR(inode->i_mode))             /* 16384 */
         {
-                printk(KERN_INFO "testfs: inode=dir\n");
                 inode->i_op     = &testfs_dir_iops; // set the inode ops
                 inode->i_fop    = &testfs_dir_fops;
         }
         else if (S_ISREG(inode->i_mode))        /* 32768 */
         {
-                printk(KERN_INFO "testfs: inode=file\n");
                 inode->i_op     = &testfs_file_iops; // set the inode ops
                 inode->i_fop    = &testfs_file_fops;
         }
@@ -180,6 +198,8 @@ int inode_get_data_block_num(struct inode *inode)
 	struct testfs_inode *raw_inode 		= (struct testfs_inode *)inode->i_private;
 	struct testfs_info *testfs_info		= (struct testfs_info *)inode->i_sb->s_fs_info;
 	struct testfs_superblock *sb		= testfs_info->sb;
+
+	printk(KERN_INFO "testfs: inode_get_data_block_num: inode number: %lu\n", inode->i_ino);
 
 	/*
 	 * we are checking if raw_inode is pointing to a valid data block number
