@@ -25,7 +25,7 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct inode *found_inode		= NULL;
 
 	if (data_block_num < 4) {
-			printk(KERN_INFO "testfs: lookup: invalid data block number for directory entry %s.\n", dentry->d_name.name);
+			printk(KERN_INFO "testfs: lookup: invalid data block number for directory entry %s. Inode number: %lu\n", dentry->d_name.name, dir->i_ino);
 			return ERR_PTR(-EIO);
 	}
 
@@ -87,6 +87,8 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	int free_inode_found	= 0;
 	struct testfs_dir_entry *raw_dentry = NULL;
 
+	printk(KERN_INFO "testfs: creating entry: %s\n", dentry->d_name.name);
+
 	// request new inode
 	new_dir = inode_get_new_inode(parent_dir->i_sb, S_IFDIR | mode);
 
@@ -140,8 +142,6 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	raw_dentry->name_len	= dentry->d_name.len;
 	memcpy(raw_dentry->name, dentry->d_name.name, dentry->d_name.len);
 
-	printk(KERN_INFO "testfs: raw_dentry name: %s, length: %d\n", raw_dentry->name, raw_dentry->name_len);
-
 	((struct testfs_inode *)parent_dir->i_private)->i_size 	+= sizeof(struct testfs_dir_entry);
 	((struct testfs_inode *)new_dir->i_private)->i_size 	= sizeof(struct testfs_dir_entry) * 2;
 	((struct testfs_inode *)new_dir->i_private)->block_ptr	= data_block_num;
@@ -178,6 +178,7 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	struct buffer_head *bh			= NULL;
 	unsigned char *buffer;
 	int bufptr = 0;		/* Buffer to hold the dir data block minus the directory name */
+	struct inode *child_dir			= dentry->d_inode;
 
 	buffer = (unsigned char *)kzalloc(TESTFS_GET_BLOCK_SIZE(dir->i_sb), GFP_KERNEL);
 	if (!buffer) {
@@ -199,16 +200,25 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	raw_dentry = (struct testfs_dir_entry *)bh->b_data;
 	for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(dir->i_sb); raw_dentry++) {
 		if (strcmp(dentry->d_name.name, raw_dentry->name) == 0) {
+			d_delete(dentry);
 			bitmap_free_inode_num(dir->i_sb, raw_dentry->inode_number);
 			raw_dentry->inode_number = 0;
 			memset(raw_dentry->name,0x00,raw_dentry->name_len);
 			raw_dentry->name_len = 0;
 
 			((struct testfs_inode *)dir->i_private)->i_size -= sizeof(struct testfs_dir_entry);             
+			dir->i_size = ((struct testfs_inode *)dir->i_private)->i_size;
+			
+			((struct testfs_inode *)child_dir->i_private)->i_size = 0;
+                        child_dir->i_size = 0;
 
 	                mark_inode_dirty(dir);
+			mark_inode_dirty(child_dir);
+
         	        mark_buffer_dirty(bh);
+			iput(child_dir);
         	        fsync_bdev(dir->i_sb->s_bdev);
+			break;
 		}
 	}
 
