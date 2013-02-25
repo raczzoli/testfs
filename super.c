@@ -106,8 +106,6 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 		goto err;
 	}
 
-	printk(KERN_INFO "testfs: mounted testfs file system\n");
-
 	return 0;
 
 err:
