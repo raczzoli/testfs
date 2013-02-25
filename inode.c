@@ -130,13 +130,15 @@ static int fill_inode(struct super_block *sb, struct inode *inode, struct testfs
 
         if (S_ISDIR(inode->i_mode))             /* 16384 */
         {
-                inode->i_op     = &testfs_dir_iops; // set the inode ops
-                inode->i_fop    = &testfs_dir_fops;
+                inode->i_op     	= &testfs_dir_iops; // set the inode ops
+                inode->i_fop    	= &testfs_dir_fops;
+		inode->i_mapping->a_ops = &testfs_aops;
         }
         else if (S_ISREG(inode->i_mode))        /* 32768 */
         {
-                inode->i_op     = &testfs_file_iops; // set the inode ops
-                inode->i_fop    = &testfs_file_fops;
+                inode->i_op     	= &testfs_file_iops; // set the inode ops
+                inode->i_fop    	= &testfs_file_fops;
+		inode->i_mapping->a_ops = &testfs_aops;
         }
 
 	return 0;
