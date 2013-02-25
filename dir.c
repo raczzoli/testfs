@@ -2,17 +2,85 @@
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
 
-
 #include "testfs.h"
 #include "dir.h"
 #include "super.h"
 #include "inode.h"
 #include "bitmap.h"
 
-static int testfs_create(struct inode *dir, struct dentry *dentry,
+
+static int add_link(struct inode *parent_inode, struct inode *child_inode, struct dentry *dentry)
+{
+	int data_block_num 			= 0;
+	struct testfs_dir_entry *raw_dentry 	= NULL;
+	struct buffer_head *bh 			= NULL;
+	int free_inode_found			= 0;
+
+	
+	d_instantiate(dentry, parent_inode);	
+	
+	data_block_num = inode_get_data_block_num(parent_inode);	
+	if (data_block_num < 4) {
+                printk(KERN_INFO "testfs: mkdir(parent dir): invalid data block number for directory entry %s.\n", dentry->d_name.name);
+                return -EIO;
+        }
+
+	if (!(bh = sb_bread(parent_inode->i_sb, data_block_num))) {
+                printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
+                return -EIO;
+        }
+	
+	
+        raw_dentry = (struct testfs_dir_entry *)bh->b_data;
+        for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(parent_inode->i_sb); raw_dentry++) {
+		if (raw_dentry->inode_number == 0) {
+			//we found an empty inode
+			free_inode_found = 1;
+			break;
+		}
+        }
+		
+	if (!free_inode_found) {
+		brelse(bh);
+		return -ENOSPC;
+	}
+
+	raw_dentry->inode_number = cpu_to_le32(child_inode->i_ino);
+	raw_dentry->type	 = 1;
+
+	raw_dentry->name_len	= dentry->d_name.len;
+	memcpy(raw_dentry->name, dentry->d_name.name, dentry->d_name.len);
+
+	((struct testfs_inode *)parent_inode->i_private)->i_size 	+= sizeof(struct testfs_dir_entry);
+	
+	mark_buffer_dirty(bh);
+	mark_inode_dirty(parent_inode);
+	
+	brelse(bh);
+	return 0;
+}
+
+
+static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 		umode_t mode, bool excl)
 {
-	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
+	struct inode *new_ino = NULL;
+	int err = 0;
+	
+	new_ino = inode_get_new_inode(parent_dir->i_sb, mode);
+
+	if (!new_ino)
+		return -ENOSPC;
+
+	err = add_link(parent_dir, new_ino, dentry);	
+	
+	if (err != 0) {
+		iput(new_ino);
+		return err;
+	}
+		
+	mark_inode_dirty(new_ino);
+		
 	return 0;
 }
 
@@ -25,13 +93,13 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct inode *found_inode		= NULL;
 
 	if (data_block_num < 4) {
-			printk(KERN_INFO "testfs: lookup: invalid data block number for directory entry %s. Inode number: %lu\n", dentry->d_name.name, dir->i_ino);
-			return ERR_PTR(-EIO);
+		printk(KERN_INFO "testfs: lookup: invalid data block number for directory entry %s. Inode number: %lu\n", dentry->d_name.name, dir->i_ino);
+		return ERR_PTR(-EIO);
 	}
 
 	if (!(bh = sb_bread(dir->i_sb, data_block_num))) {
-			printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
-			return ERR_PTR(-EIO);
+		printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
+		return ERR_PTR(-EIO);
 	}	
 
 	raw_dentry = (struct testfs_dir_entry *)bh->b_data;	
@@ -50,7 +118,7 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 		
 		found_inode = inode_iget(dir->i_sb, le32_to_cpu(raw_dentry->inode_number));
 		d_add(dentry, found_inode);		
-		
+		printk(KERN_INFO "testfs: entered here");
 		return 0;
 	}
 
@@ -80,14 +148,11 @@ static int testfs_symlink(struct inode *dir, struct dentry *dentry,
 
 static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t mode)
 {
+	struct inode *new_dir 			= NULL;
+	struct buffer_head *new_dir_bh 		= NULL;
+	struct testfs_dir_entry *raw_dentry 	= NULL;
 	int data_block_num	= 0;
-	struct inode *new_dir 	= NULL;
-	struct buffer_head *bh 	= NULL;
-	struct buffer_head *new_dir_bh = NULL;
-	int free_inode_found	= 0;
-	struct testfs_dir_entry *raw_dentry = NULL;
-
-	printk(KERN_INFO "testfs: creating entry: %s\n", dentry->d_name.name);
+	int err			= 0;
 
 	// request new inode
 	new_dir = inode_get_new_inode(parent_dir->i_sb, S_IFDIR | mode);
@@ -95,57 +160,30 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	if (!new_dir) 
 		return -ENOSPC;
 
-	d_instantiate(dentry, parent_dir);	
-
-	data_block_num = inode_get_data_block_num(parent_dir);	
-	if (data_block_num < 4) {
-                printk(KERN_INFO "testfs: mkdir(parent dir): invalid data block number for directory entry %s.\n", dentry->d_name.name);
-                return -EIO;
-        }
-
-	if (!(bh = sb_bread(parent_dir->i_sb, data_block_num))) {
-                printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
-                return -EIO;
-        }
+	err = add_link(parent_dir, new_dir, dentry);
+		
+	if (err != 0) {
+		iput(new_dir);
+		return err;
+	}
 	
 	data_block_num = inode_get_data_block_num(new_dir);
 	if (data_block_num < 4) {
                 printk(KERN_INFO "testfs: mkdir(new dir): invalid data block number for directory entry %s.\n", dentry->d_name.name);
-		brelse(bh);
                 return -EIO;
         }
 
 	if (!(new_dir_bh = sb_bread(new_dir->i_sb, data_block_num))) {
                 printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
-		brelse(bh);
                 return -EIO;
         }
-	
-        raw_dentry = (struct testfs_dir_entry *)bh->b_data;
-        for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(parent_dir->i_sb); raw_dentry++) {
-		if (raw_dentry->inode_number == 0) {
-			//we found an empty inode
-			free_inode_found = 1;
-			break;
-		}
-        }
-		
-	if (!free_inode_found) {
-		brelse(new_dir_bh);
-		brelse(bh);
-		return -ENOSPC;
-	}
 
-	raw_dentry->inode_number = cpu_to_le32(new_dir->i_ino);
-	raw_dentry->type	 = 1;
-
-	raw_dentry->name_len	= dentry->d_name.len;
-	memcpy(raw_dentry->name, dentry->d_name.name, dentry->d_name.len);
-
-	((struct testfs_inode *)parent_dir->i_private)->i_size 	+= sizeof(struct testfs_dir_entry);
+	/*
+	 * we add the two . and .. directory entries to the inode`s datablock.
+	 */
 	((struct testfs_inode *)new_dir->i_private)->i_size 	= sizeof(struct testfs_dir_entry) * 2;
 	((struct testfs_inode *)new_dir->i_private)->block_ptr	= data_block_num;
-
+	
 	raw_dentry = (struct testfs_dir_entry *)new_dir_bh->b_data;
 	memcpy(raw_dentry->name, ".", 1);
 	raw_dentry->name_len 	= 1;
@@ -161,12 +199,8 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	mark_buffer_dirty(new_dir_bh);
 	mark_inode_dirty(new_dir);
 
-	mark_buffer_dirty(bh);
-	mark_inode_dirty(parent_dir);
-
 	fsync_bdev(parent_dir->i_sb->s_bdev);
 
-	brelse(bh);
 	brelse(new_dir_bh);
 	return 0;
 }
@@ -176,15 +210,7 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	int data_block_num 			= inode_get_data_block_num(dir);
 	struct testfs_dir_entry *raw_dentry 	= NULL;
 	struct buffer_head *bh			= NULL;
-	unsigned char *buffer;
-	int bufptr = 0;		/* Buffer to hold the dir data block minus the directory name */
 	struct inode *child_dir			= dentry->d_inode;
-
-	buffer = (unsigned char *)kzalloc(TESTFS_GET_BLOCK_SIZE(dir->i_sb), GFP_KERNEL);
-	if (!buffer) {
-		printk(KERN_INFO "testfs: failed to allocate temporary buffer\n");
-		return -EIO;
-	}
 
 	if (data_block_num < 4) {
 		printk(KERN_INFO "testfs: rmdir: invalid data block number for directory entry %s.\n", dentry->d_name.name);
@@ -196,7 +222,6 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 		return -EIO;
 	}
 
-	bufptr = 0;
 	raw_dentry = (struct testfs_dir_entry *)bh->b_data;
 	for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(dir->i_sb); raw_dentry++) {
 		if (strcmp(dentry->d_name.name, raw_dentry->name) == 0) {
@@ -236,9 +261,6 @@ static int testfs_mknod(struct inode *dir, struct dentry *dentry, umode_t mode,
 static int testfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		struct inode *new_dir, struct dentry *new_dentry)
 {
-	
-
-
 	return 0;
 }
 
