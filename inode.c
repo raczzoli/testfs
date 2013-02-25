@@ -69,7 +69,6 @@ struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
 		return NULL;
 	}
 
-	//new_ino = iget_locked(sb, new_inode_num);
 	new_ino = new_inode(sb);
         if (!new_ino) {
 		printk(KERN_INFO "testfs: inode_get_new_inode: new_ino = NULL\n");
