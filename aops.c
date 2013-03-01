@@ -1,11 +1,34 @@
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
 
-
+#include "testfs.h"
+#include "inode.h"
 #include "aops.h"
+
 
 int testfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)
 {
+	int err = 0;
+	struct testfs_inode *testfs_inode = TESTFS_GET_INODE(inode); 
+
+	if (create) {
+		err = inode_alloc_data_block(inode->i_sb, inode);	
+		if (err) {
+			printk(KERN_INFO "testfs: entered here\n");
+			return err;
+		}
+
+		bh_result->b_state      |= (1UL << BH_New);
+	}
+	else {
+		bh_result->b_state      |= (1UL << BH_Mapped);
+	}
+
+	printk(KERN_INFO "testfs: testfs_get_block: op: %d, new data block for inode: %d\n", create, testfs_inode->block_ptr);
+
+	bh_result->b_bdev 	= inode->i_sb->s_bdev;
+        bh_result->b_blocknr 	= testfs_inode->block_ptr;
+
 	return 0;
 }
 
