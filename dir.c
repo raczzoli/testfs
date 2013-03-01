@@ -67,7 +67,7 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 	struct inode *new_ino = NULL;
 	int err = 0;
 	
-	new_ino = inode_get_new_inode(parent_dir->i_sb, mode);
+	new_ino = inode_get_new_inode(parent_dir->i_sb, S_IFREG | mode, 0);
 
 	if (!new_ino)
 		return -ENOSPC;
@@ -80,7 +80,7 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 	}
 		
 	mark_inode_dirty(new_ino);
-		
+
 	return 0;
 }
 
@@ -117,8 +117,7 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 		brelse(bh);
 		
 		found_inode = inode_iget(dir->i_sb, le32_to_cpu(raw_dentry->inode_number));
-		d_add(dentry, found_inode);		
-		printk(KERN_INFO "testfs: entered here");
+		d_add(dentry, found_inode);
 		return 0;
 	}
 
@@ -153,13 +152,16 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	struct testfs_dir_entry *raw_dentry 	= NULL;
 	int data_block_num	= 0;
 	int err			= 0;
+	struct testfs_inode *new_testfs_ino 	= NULL;	
 
 	// request new inode
-	new_dir = inode_get_new_inode(parent_dir->i_sb, S_IFDIR | mode);
+	new_dir = inode_get_new_inode(parent_dir->i_sb, S_IFDIR | mode, 1);
 
 	if (!new_dir) 
 		return -ENOSPC;
 
+	new_testfs_ino = TESTFS_GET_INODE(new_dir);
+	
 	err = add_link(parent_dir, new_dir, dentry);
 		
 	if (err != 0) {
@@ -167,13 +169,8 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 		return err;
 	}
 	
-	data_block_num = inode_get_data_block_num(new_dir);
-	if (data_block_num < 4) {
-                printk(KERN_INFO "testfs: mkdir(new dir): invalid data block number for directory entry %s.\n", dentry->d_name.name);
-                return -EIO;
-        }
 
-	if (!(new_dir_bh = sb_bread(new_dir->i_sb, data_block_num))) {
+	if (!(new_dir_bh = sb_bread(new_dir->i_sb, new_testfs_ino->block_ptr))) {
                 printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
                 return -EIO;
         }
@@ -181,8 +178,7 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	/*
 	 * we add the two . and .. directory entries to the inode`s datablock.
 	 */
-	((struct testfs_inode *)new_dir->i_private)->i_size 	= sizeof(struct testfs_dir_entry) * 2;
-	((struct testfs_inode *)new_dir->i_private)->block_ptr	= data_block_num;
+	new_testfs_ino->i_size 		= sizeof(struct testfs_dir_entry) * 2;
 	
 	raw_dentry = (struct testfs_dir_entry *)new_dir_bh->b_data;
 	memcpy(raw_dentry->name, ".", 1);
