@@ -6,6 +6,6 @@
 #define TESTFS_ROOT_INODE_NUM   1
 
 #define TESTFS_GET_BLOCK_SIZE(sb)	(sb->s_blocksize)
-
+#define TESTFS_GET_INODE(inode)		(struct testfs_inode *)inode->i_private
 
 #endif /* TESTFS_H */
