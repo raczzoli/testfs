@@ -2,11 +2,12 @@
 #include <linux/slab.h>
 #include <linux/quotaops.h>
 
+#include "testfs.h"
 #include "inode.h"
 #include "dir.h"
 #include "super.h"
 #include "bitmap.h"
-
+#include "aops.h"
 
 
 /*
@@ -57,7 +58,7 @@ err_read_inode:
 }
 
 
-struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
+struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode, int alloc_data_block)
 {
 	int err					= 0;
 	struct inode *new_ino	 		= NULL;
@@ -97,16 +98,20 @@ struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode)
         }
 
 	testfs_inode->i_mode 	= mode;	
-	
-	if (bitmap_get_free_data_block_num(sb, &testfs_inode->block_ptr) != 0) {
-		printk(KERN_INFO "testfs: Error allocating data block for new inode!\n");
-		return NULL;
-	}
-	
-	new_ino->i_ino = new_inode_num;
+	new_ino->i_ino 		= new_inode_num;
+
 	fill_inode(sb, new_ino, testfs_inode);
 
 	insert_inode_hash(new_ino);
+
+        if (alloc_data_block) {
+                err = inode_alloc_data_block(sb, new_ino);
+                if (err) {
+                        unlock_new_inode(new_ino);
+                        iput(new_ino);
+                        return ERR_PTR(err);
+                }
+        }
 
 	unlock_new_inode(new_ino);
 
@@ -128,18 +133,25 @@ static int fill_inode(struct super_block *sb, struct inode *inode, struct testfs
         inode->i_mtime.tv_sec = (signed)le32_to_cpu(0);
         inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_mtime.tv_nsec = 0;
 
+	printk(KERN_INFO "testfs: fill_inode: inode_number: %lu, mode: %d\n", inode->i_ino, inode->i_mode);
+
         if (S_ISDIR(inode->i_mode))             /* 16384 */
         {
+		printk(KERN_INFO "testfs: is dir\n");
                 inode->i_op     	= &testfs_dir_iops; // set the inode ops
                 inode->i_fop    	= &testfs_dir_fops;
 		inode->i_mapping->a_ops = &testfs_aops;
         }
         else if (S_ISREG(inode->i_mode))        /* 32768 */
         {
+		printk(KERN_INFO "testfs: is file\n");
                 inode->i_op     	= &testfs_file_iops; // set the inode ops
                 inode->i_fop    	= &testfs_file_fops;
 		inode->i_mapping->a_ops = &testfs_aops;
         }
+	else {
+		printk(KERN_INFO "testfs: is something else\n");
+	}
 
 	return 0;
 }
@@ -187,6 +199,8 @@ int inode_write_inode(struct inode *inode, struct writeback_control *wbc)
 	raw_inode->i_mode 	= inode->i_mode;
 	raw_inode->block_ptr 	= ((struct testfs_inode *)inode->i_private)->block_ptr;
 
+	printk(KERN_INFO "testfs: writing inode: %lu, mode: %d\n", inode->i_ino, raw_inode->i_mode);
+
 	mark_buffer_dirty(iloc.bh);
 
         return 0;
@@ -194,13 +208,26 @@ int inode_write_inode(struct inode *inode, struct writeback_control *wbc)
 
 
 
+int inode_alloc_data_block(struct super_block *sb, struct inode *inode)
+{
+	struct testfs_inode *testfs_inode = TESTFS_GET_INODE(inode);
+
+	if (bitmap_get_free_data_block_num(sb, &testfs_inode->block_ptr) != 0) {
+                printk(KERN_INFO "testfs: Error allocating data block for new inode!\n");
+                return -ENOSPC;
+        }
+
+	mark_inode_dirty(inode);
+
+	return 0;
+}
+
+
 int inode_get_data_block_num(struct inode *inode)
 {
 	struct testfs_inode *raw_inode 		= (struct testfs_inode *)inode->i_private;
 	struct testfs_info *testfs_info		= (struct testfs_info *)inode->i_sb->s_fs_info;
 	struct testfs_superblock *sb		= testfs_info->sb;
-
-	printk(KERN_INFO "testfs: inode_get_data_block_num: inode number: %lu\n", inode->i_ino);
 
 	/*
 	 * we are checking if raw_inode is pointing to a valid data block number
