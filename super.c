@@ -11,13 +11,11 @@
 static int fill_super(struct super_block *sb, void *data, int silent);
 
 // super operations
-static void put_super(struct super_block *);
-//static void write_super(struct super_block *sb);
+static void put_super(struct super_block *sb);
 
 static struct super_operations testfs_super_ops = {
 	.put_super 	= put_super,
-	.write_inode	= inode_write_inode,
-//	.write_super	= write_super
+	.write_inode	= inode_write_inode
 };
 
 
@@ -125,39 +123,6 @@ err:
 
 	return ret;
 }
-
-/*
-static void write_super(struct super_block *sb)
-{
-	struct buffer_head *inode_bmp_bh 	= NULL;
-	struct buffer_head *block_bmp_bh  	= NULL;	
-	struct testfs_info *testfs_i		= sb->s_fs_info;
-	struct testfs_superblock *testfs_sb     = testfs_i->sb;
-
-        if (!(inode_bmp_bh = sb_bread(sb, testfs_sb->inode_bitmap)))
-        {
-                printk(KERN_ERR "testfs: unable to read inode bitmap from disk.\n");
-                return;
-        }
-
-	if (!(block_bmp_bh = sb_bread(sb, testfs_sb->block_bitmap)))
-        {
-                printk(KERN_ERR "testfs: unable to read block bitmap from disk.\n");
-                return;
-        }
-
-	memcpy(inode_bmp_bh->b_data, testfs_i->inode_bitmap, testfs_sb->block_size);
-	memcpy(block_bmp_bh->b_data, testfs_i->block_bitmap, testfs_sb->block_size);
-
-	mark_buffer_dirty(inode_bmp_bh);
-	mark_buffer_dirty(block_bmp_bh);
-
-	sb->s_dirt = 0;
-
-	brelse(inode_bmp_bh);
-	brelse(block_bmp_bh);
-}
-*/
 
 
 static void put_super (struct super_block *sb)
