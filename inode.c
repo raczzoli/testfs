@@ -199,7 +199,7 @@ int inode_write_inode(struct inode *inode, struct writeback_control *wbc)
 	raw_inode->i_mode 	= inode->i_mode;
 	raw_inode->block_ptr 	= ((struct testfs_inode *)inode->i_private)->block_ptr;
 
-	printk(KERN_INFO "testfs: writing inode: %lu, mode: %d\n", inode->i_ino, raw_inode->i_mode);
+	printk(KERN_INFO "testfs: writing inode: %lu, mode: %d, type: %s\n", inode->i_ino, raw_inode->i_mode, S_ISREG(inode->i_mode) ? "file" : "dir");
 
 	mark_buffer_dirty(iloc.bh);
 
