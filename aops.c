@@ -8,17 +8,21 @@
 
 int testfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)
 {
+
 	int err = 0;
 	struct testfs_inode *testfs_inode = TESTFS_GET_INODE(inode); 
 
-	if (create) {
-		err = inode_alloc_data_block(inode->i_sb, inode);	
-		if (err) {
-			printk(KERN_INFO "testfs: entered here\n");
-			return err;
-		}
+	if (testfs_inode->block_ptr == 0) {
+		printk(KERN_INFO "testfs: testfs_get_block: block_ptr == 0, create=%d\n", create);
+		if (create == 0) 
+			return 0;
 
-		bh_result->b_state      |= (1UL << BH_New);
+		err = inode_alloc_data_block(inode->i_sb, inode);
+                if (err) {
+                        printk(KERN_INFO "testfs: entered here\n");
+                        return err;
+                }
+		bh_result->b_state |= (1UL << BH_New) | (1UL << BH_Mapped);
 	}
 	else {
 		bh_result->b_state      |= (1UL << BH_Mapped);
@@ -34,22 +38,26 @@ int testfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *b
 
 static int testfs_writepage(struct page *page, struct writeback_control *wbc)
 {
+	printk(KERN_INFO "testfs: testfs_writepage called\n");
 	return block_write_full_page(page, testfs_get_block, wbc);
 }
 
 static int testfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
+	printk(KERN_INFO "testfs: testfs_writepages called\n");
 	return mpage_writepages(mapping, wbc, testfs_get_block);
 }
 
 static int testfs_readpage(struct file *file, struct page *page)
 {
+	printk(KERN_INFO "testfs: testfs_readpage called\n");
 	return mpage_readpage(page, testfs_get_block);
 }
 
 static int testfs_readpages(struct file *file, struct address_space *mapping,
 		struct list_head *pages, unsigned nr_pages)
 {
+	printk(KERN_INFO "testfs: testfs_readpages called\n");
 	return mpage_readpages(mapping, pages, nr_pages, testfs_get_block);
 }
 
