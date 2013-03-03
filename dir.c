@@ -9,7 +9,7 @@
 #include "bitmap.h"
 
 
-static int add_link(struct inode *parent_inode, struct inode *child_inode, struct dentry *dentry)
+static int add_link(struct inode *parent_inode, struct inode *child_inode, struct dentry *dentry, int type)
 {
 	int data_block_num 			= 0;
 	struct testfs_dir_entry *raw_dentry 	= NULL;
@@ -46,7 +46,7 @@ static int add_link(struct inode *parent_inode, struct inode *child_inode, struc
 	}
 
 	raw_dentry->inode_number = cpu_to_le32(child_inode->i_ino);
-	raw_dentry->type	 = 1;
+	raw_dentry->type	 = type;
 
 	raw_dentry->name_len	= dentry->d_name.len;
 	memcpy(raw_dentry->name, dentry->d_name.name, dentry->d_name.len);
@@ -67,12 +67,12 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 	struct inode *new_ino = NULL;
 	int err = 0;
 	
-	new_ino = inode_get_new_inode(parent_dir->i_sb, S_IFREG | mode, 0);
+	new_ino = inode_get_new_inode(parent_dir->i_sb, mode, 0);
 
 	if (!new_ino)
 		return -ENOSPC;
 
-	err = add_link(parent_dir, new_ino, dentry);	
+	err = add_link(parent_dir, new_ino, dentry, DT_REG);	
 	
 	if (err != 0) {
 		iput(new_ino);
@@ -80,6 +80,7 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 	}
 		
 	mark_inode_dirty(new_ino);
+	fsync_bdev(parent_dir->i_sb->s_bdev);
 
 	return 0;
 }
@@ -162,7 +163,7 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 
 	new_testfs_ino = TESTFS_GET_INODE(new_dir);
 	
-	err = add_link(parent_dir, new_dir, dentry);
+	err = add_link(parent_dir, new_dir, dentry, DT_DIR);
 		
 	if (err != 0) {
 		iput(new_dir);
