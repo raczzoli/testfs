@@ -67,7 +67,7 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 	struct inode *new_ino = NULL;
 	int err = 0;
 	
-	new_ino = inode_get_new_inode(parent_dir->i_sb, mode, 0);
+	new_ino = inode_get_new_inode(parent_dir, mode, 0);
 
 	if (!new_ino)
 		return -ENOSPC;
@@ -78,7 +78,10 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 		iput(new_ino);
 		return err;
 	}
-		
+	
+	((struct testfs_inode *)new_ino->i_private)->i_size = 0;
+	new_ino->i_size = 0;
+	
 	mark_inode_dirty(new_ino);
 	fsync_bdev(parent_dir->i_sb->s_bdev);
 
@@ -156,7 +159,7 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	struct testfs_inode *new_testfs_ino 	= NULL;	
 
 	// request new inode
-	new_dir = inode_get_new_inode(parent_dir->i_sb, S_IFDIR | mode, 1);
+	new_dir = inode_get_new_inode(parent_dir, S_IFDIR | mode, 1);
 
 	if (!new_dir) 
 		return -ENOSPC;
