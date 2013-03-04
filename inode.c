@@ -58,12 +58,13 @@ err_read_inode:
 }
 
 
-struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode, int alloc_data_block)
+struct inode *inode_get_new_inode(struct inode *dir, umode_t mode, int alloc_data_block)
 {
 	int err					= 0;
 	struct inode *new_ino	 		= NULL;
 	int new_inode_num 			= 0;
 	struct testfs_inode *testfs_inode	= NULL;
+	struct super_block *sb			= dir->i_sb;
 
 	if (bitmap_get_free_inode_num(sb, &new_inode_num) != 0){
 		printk(KERN_INFO "testfs: No more free inodes left!\n");
@@ -97,12 +98,18 @@ struct inode *inode_get_new_inode(struct super_block *sb, umode_t mode, int allo
                 return NULL;
         }
 
+	testfs_inode->block_ptr = 0;
 	testfs_inode->i_mode 	= mode;	
 	new_ino->i_ino 		= new_inode_num;
 
 	fill_inode(sb, new_ino, testfs_inode);
 
+	new_ino->i_atime = new_ino->i_ctime = new_ino->i_mtime = CURRENT_TIME_SEC;
+
+	inode_init_owner(new_ino, dir, mode);
+
 	insert_inode_hash(new_ino);
+	mark_inode_dirty(new_ino);
 
         if (alloc_data_block) {
                 err = inode_alloc_data_block(sb, new_ino);
@@ -133,25 +140,16 @@ static int fill_inode(struct super_block *sb, struct inode *inode, struct testfs
         inode->i_mtime.tv_sec = (signed)le32_to_cpu(0);
         inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_mtime.tv_nsec = 0;
 
-	printk(KERN_INFO "testfs: fill_inode: inode_number: %lu, mode: %d\n", inode->i_ino, inode->i_mode);
-
-        if (S_ISDIR(inode->i_mode))             /* 16384 */
-        {
-		printk(KERN_INFO "testfs: is dir\n");
+        if (S_ISDIR(inode->i_mode)) {            /* 16384 */
                 inode->i_op     	= &testfs_dir_iops; // set the inode ops
                 inode->i_fop    	= &testfs_dir_fops;
 		inode->i_mapping->a_ops = &testfs_aops;
         }
-        else if (S_ISREG(inode->i_mode))        /* 32768 */
-        {
-		printk(KERN_INFO "testfs: is file\n");
+        else if (S_ISREG(inode->i_mode)) {        /* 32768 */
                 inode->i_op     	= &testfs_file_iops; // set the inode ops
                 inode->i_fop    	= &testfs_file_fops;
 		inode->i_mapping->a_ops = &testfs_aops;
         }
-	else {
-		printk(KERN_INFO "testfs: is something else\n");
-	}
 
 	return 0;
 }
