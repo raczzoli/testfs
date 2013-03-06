@@ -81,7 +81,7 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 	
 	((struct testfs_inode *)new_ino->i_private)->i_size = 0;
 	new_ino->i_size = 0;
-	
+
 	mark_inode_dirty(new_ino);
 	fsync_bdev(parent_dir->i_sb->s_bdev);
 
@@ -327,6 +327,7 @@ static int testfs_release(struct inode *inode, struct file *filp)
 	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 	return 0;
 }
+
 
 /* dir file opertions */
 const struct file_operations testfs_dir_fops = {
