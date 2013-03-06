@@ -5,6 +5,7 @@
 #include "testfs.h"
 #include "inode.h"
 #include "dir.h"
+#include "file.h"
 #include "super.h"
 #include "bitmap.h"
 #include "aops.h"
@@ -82,6 +83,8 @@ struct inode *inode_get_new_inode(struct inode *dir, umode_t mode, int alloc_dat
 		iput(new_ino);
 		return ERR_PTR(-EIO);
 	}
+
+	new_ino->i_flags = 4096;
 
 	dquot_initialize(new_ino);
 	err = dquot_alloc_inode(new_ino);

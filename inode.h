@@ -3,11 +3,6 @@
 
 #include <linux/fs.h>
 
-/* file.c */
-extern const struct file_operations testfs_file_fops;
-extern const struct inode_operations testfs_file_iops;
-
-extern const struct address_space_operations testfs_aops;
 
 /* On disk inode structure */
 struct testfs_inode {
