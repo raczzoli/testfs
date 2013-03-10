@@ -11,6 +11,7 @@ int main()
 	int ret				= 0;
 	char source_buffer[]		= "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam ac erat justo, nec lobortis metus. Nullam interdum varius commod";
 	char target_buffer[1024];
+	int i				= 2;
 
 	memset(target_buffer, 0x00, sizeof target_buffer);
 
@@ -21,25 +22,27 @@ int main()
 
 	if (fp) {
 
-		ret = fseek(fp, 0, SEEK_SET);
+		while(i--)
+		{
+			ret = fseek(fp, 0, SEEK_SET);
 
-		if (ret) {
-			printf("fseek failed: %s\n", strerror(errno));
+			if (ret) {
+				printf("fseek failed: %s\n", strerror(errno));
+			}
+
+			num_bytes = fwrite(source_buffer, 1, sizeof source_buffer, fp);
+			printf("bytes written: %d.\n", num_bytes);
+
+			ret = fseek(fp, 0, SEEK_SET);
+			if (ret) {
+                        	printf("fseek failed: %s\n", strerror(errno));
+                	}
+
+			num_bytes = fread(target_buffer, 1, sizeof source_buffer, fp);
+			printf("bytes read: %d.\n", num_bytes);		
+
+			printf("----------------------------------\n%s\n----------------------------------------------\n", target_buffer);
 		}
-
-		num_bytes = fwrite(source_buffer, 1, sizeof source_buffer, fp);
-		printf("bytes written: %d.\n", num_bytes);
-
-		ret = fseek(fp, 0, SEEK_SET);
-		if (ret) {
-                        printf("fseek failed: %s\n", strerror(errno));
-                }
-
-		num_bytes = fread(target_buffer, 1, sizeof source_buffer, fp);
-		printf("bytes read: %d.\n", num_bytes);		
-
-		printf("----------------------------------\n%s\n----------------------------------------------\n", target_buffer);
-
 		fclose(fp);
 	}
 
