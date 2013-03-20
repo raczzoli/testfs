@@ -1,6 +1,7 @@
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
+#include <linux/quotaops.h>
 
 #include "testfs.h"
 #include "dir.h"
@@ -17,7 +18,8 @@ static int add_link(struct inode *parent_inode, struct inode *child_inode, struc
 	int free_inode_found			= 0;
 
 	
-	d_instantiate(dentry, parent_inode);	
+	//d_instantiate(dentry, parent_inode);		
+	d_instantiate(dentry, child_inode);	
 	
 	data_block_num = inode_get_data_block_num(parent_inode);	
 	if (data_block_num < 4) {
@@ -52,7 +54,7 @@ static int add_link(struct inode *parent_inode, struct inode *child_inode, struc
 	memcpy(raw_dentry->name, dentry->d_name.name, dentry->d_name.len);
 
 	((struct testfs_inode *)parent_inode->i_private)->i_size 	+= sizeof(struct testfs_dir_entry);
-	
+		
 	mark_buffer_dirty(bh);
 	mark_inode_dirty(parent_inode);
 	
@@ -66,6 +68,10 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 {
 	struct inode *new_ino = NULL;
 	int err = 0;
+
+	printk(KERN_INFO "testfs: create...\n");
+
+	dquot_initialize(parent_dir);
 	
 	new_ino = inode_get_new_inode(parent_dir, mode, 0);
 
@@ -83,6 +89,9 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 	new_ino->i_size = 0;
 
 	mark_inode_dirty(new_ino);
+	unlock_new_inode(new_ino);
+
+
 	fsync_bdev(parent_dir->i_sb->s_bdev);
 
 	return 0;
@@ -95,6 +104,8 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct testfs_dir_entry *raw_dentry 	= NULL;
 	struct buffer_head *bh			= NULL;
 	struct inode *found_inode		= NULL;
+
+	printk(KERN_INFO "testfs: lookup...\n");
 
 	if (data_block_num < 4) {
 		printk(KERN_INFO "testfs: lookup: invalid data block number for directory entry %s. Inode number: %lu\n", dentry->d_name.name, dir->i_ino);
@@ -198,6 +209,8 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 
 	mark_buffer_dirty(new_dir_bh);
 	mark_inode_dirty(new_dir);
+
+	printk(KERN_INFO "testfs: inode uid: %d, gid: %d\n", new_dir->i_uid, new_dir->i_gid);
 
 	fsync_bdev(parent_dir->i_sb->s_bdev);
 
@@ -313,6 +326,7 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 		printk(KERN_INFO "testfs: listing: %s\n", raw_dentry->name);
 		if (raw_dentry->inode_number > 0)
 		{
+			printk(KERN_INFO "testfs: readdir: name: %s, type: %d\n", raw_dentry->name, raw_dentry->type);
 			filldir(dirent, raw_dentry->name, raw_dentry->name_len, fp->f_pos, raw_dentry->inode_number, raw_dentry->type);
 			fp->f_pos += sizeof(struct testfs_dir_entry);
 		}
@@ -327,6 +341,7 @@ static int testfs_release(struct inode *inode, struct file *filp)
 	printk(KERN_INFO "testfs: %s\n", __FUNCTION__);
 	return 0;
 }
+
 
 
 /* dir file opertions */
@@ -346,6 +361,6 @@ const struct inode_operations testfs_dir_iops = {
 	.mkdir		= testfs_mkdir,
 	.rmdir		= testfs_rmdir,
 	.mknod		= testfs_mknod,
-	.rename		= testfs_rename,
+	.rename		= testfs_rename
 };
 
