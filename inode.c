@@ -1,6 +1,7 @@
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
 #include <linux/quotaops.h>
+#include <linux/security.h>
 
 #include "testfs.h"
 #include "inode.h"
@@ -78,13 +79,12 @@ struct inode *inode_get_new_inode(struct inode *dir, umode_t mode, int alloc_dat
                 return ERR_PTR(-ENOMEM);
         }
 
+
 	if (insert_inode_locked(new_ino) < 0) {
 		printk(KERN_INFO "testfs: inode allocated twice!\n");
 		iput(new_ino);
 		return ERR_PTR(-EIO);
 	}
-
-	new_ino->i_flags = 4096;
 
 	dquot_initialize(new_ino);
 	err = dquot_alloc_inode(new_ino);
@@ -107,8 +107,13 @@ struct inode *inode_get_new_inode(struct inode *dir, umode_t mode, int alloc_dat
 
 	fill_inode(sb, new_ino, testfs_inode);
 
-	new_ino->i_atime = new_ino->i_ctime = new_ino->i_mtime = CURRENT_TIME_SEC;
-
+	new_ino->i_atime 	= new_ino->i_ctime = new_ino->i_mtime = CURRENT_TIME_SEC;
+	new_ino->i_size		= 234;
+        new_ino->i_blkbits     	= 12; // hardcode... block size = 1 << blkbits, 4096 = 1 << blkbits, 4096 = 1 << 12
+	new_ino->i_blocks	= 0;
+	
+		
+	security_inode_init_security(new_ino, dir, NULL, NULL, NULL);
 	inode_init_owner(new_ino, dir, mode);
 
 	insert_inode_hash(new_ino);
@@ -136,8 +141,12 @@ static int fill_inode(struct super_block *sb, struct inode *inode, struct testfs
         inode->i_mode = le16_to_cpu(raw_inode->i_mode);
         inode->i_size = le16_to_cpu(raw_inode->i_size);
         inode->i_private = raw_inode;
+
+	printk(KERN_INFO "testfs: file_inode: fsuid %d, fsgid %d\n", current_fsuid(), current_fsgid());
+
         i_uid_write(inode, 0);
         i_gid_write(inode, 0);
+
         inode->i_atime.tv_sec = (signed)le32_to_cpu(0);
         inode->i_ctime.tv_sec = (signed)le32_to_cpu(0);
         inode->i_mtime.tv_sec = (signed)le32_to_cpu(0);
