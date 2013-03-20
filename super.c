@@ -86,7 +86,7 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 
 	sb->s_fs_info		= testfs_i;
 	sb->s_blocksize 	= testfs_sb->block_size;
-	sb->s_blocksize_bits 	= 10;
+	sb->s_blocksize_bits 	= 12;  // hardcode... block size = 1 << blkbits, 4096 = 1 << blkbits, 4096 = 1 << 12
 	sb->s_magic		= TESTFS_MAGIC_NUM;
 	sb->s_op		= &testfs_super_ops;
 
