@@ -70,8 +70,8 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 	}
 	
 	printk(KERN_INFO "testfs: magic=%d block_size=%d "
-		"block_count=%d itable=%d itable_size=%d block_bitmap=%d\n",
-		testfs_sb->magic, testfs_sb->block_size, testfs_sb->block_count,
+		"itable=%d itable_size=%d block_bitmap=%d\n",
+		testfs_sb->magic, testfs_sb->block_size,
 		testfs_sb->itable, testfs_sb->itable_size,
 		testfs_sb->block_bitmap);
 
