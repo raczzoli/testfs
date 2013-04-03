@@ -142,8 +142,6 @@ static int fill_inode(struct super_block *sb, struct inode *inode, struct testfs
         inode->i_size = le16_to_cpu(raw_inode->i_size);
         inode->i_private = raw_inode;
 
-	printk(KERN_INFO "testfs: file_inode: fsuid %d, fsgid %d\n", current_fsuid(), current_fsgid());
-
         i_uid_write(inode, 0);
         i_gid_write(inode, 0);
 
