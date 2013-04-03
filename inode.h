@@ -8,6 +8,7 @@
 struct testfs_inode {
 	__le16 i_mode;		/* Mode */
 	__le16 i_size;		/* Size */
+	__le32 group;		/* Block group */
 	__le32 block_ptr;	/* Pointer to data block */
 };
 
