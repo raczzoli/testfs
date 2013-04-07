@@ -7,7 +7,6 @@
 #include "dir.h"
 #include "super.h"
 #include "inode.h"
-#include "bitmap.h"
 
 
 static int add_link(struct inode *parent_inode, struct inode *child_inode, struct dentry *dentry, int type)
@@ -239,7 +238,8 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(dir->i_sb); raw_dentry++) {
 		if (strcmp(dentry->d_name.name, raw_dentry->name) == 0) {
 			d_delete(dentry);
-			bitmap_free_inode_num(dir->i_sb, raw_dentry->inode_number);
+			// TODO: REPLACE WITH ext2_set_bit_atomic
+			//bitmap_free_inode_num(dir->i_sb, raw_dentry->inode_number);
 			raw_dentry->inode_number = 0;
 			memset(raw_dentry->name,0x00,raw_dentry->name_len);
 			raw_dentry->name_len = 0;
