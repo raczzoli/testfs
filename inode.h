@@ -12,9 +12,16 @@ struct testfs_inode {
 	__le32 block_ptr;	/* Pointer to data block */
 };
 
+struct testfs_group_desc {
+        __le32 block_bitmap;
+        __le32 inode_bitmap;
+        __le32 inode_table;
+};
+
 /* Inode memory and on disk locations */
 struct testfs_iloc {
 	struct buffer_head *bh;
+	u32 group;
 	u32 block_num;
 	u32 offset;
 	u32 ino;

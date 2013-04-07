@@ -8,10 +8,13 @@ struct testfs_superblock {
 	__le32 magic;		/* Magic number */
 	__le32 block_size;	/* Block size */
 	__le32 block_count;	/* Number of blocks. Max is 32768 blocks */
-	__le32 itable;		/* Block number of inode table */
-	__le32 itable_size;	/* Size in blocks of inode table */
-	__le32 block_bitmap;	/* Location of block usage bitmap */
-	__le32 inode_bitmap;	/* Location of inode bitmap */
+	__le32 group_count;	/* Number of block groups */
+	__le32 blocks_per_group;	/* Number of blocks in group */
+	__le32 inodes_per_group;	/* Number of inodes in group */
+	//__le32 itable;		/* Block number of inode table */
+	//__le32 itable_size;	/* Size in blocks of inode table */
+	//__le32 block_bitmap;	/* Location of block usage bitmap */
+	//__le32 inode_bitmap;	/* Location of inode bitmap */
 	__le32 rootdir_inode;	/* Inode number of the root directory */
 };
 
@@ -20,10 +23,11 @@ struct testfs_info {
 	struct testfs_superblock *sb;		/* Pointer to on disk structure */
 	struct buffer_head *bh;			/* Pointer to sb buffer head */
 	struct inode *root;			/* Root directory inode */
+	struct buffer_head **group_desc_bh;
 //	char *block_bitmap;			/* Pointer to on disk block bitmap */
 //	char *inode_bitmap;			/* Pointer to on disk inode bitmap */
-	struct buffer_head *block_bmp_bh;	/* Block bitmap buffer head */
-	struct buffer_head *inode_bmp_bh;	/* Inode bitmap buffer head */
+//	struct buffer_head *block_bmp_bh;	/* Block bitmap buffer head */
+//	struct buffer_head *inode_bmp_bh;	/* Inode bitmap buffer head */
 };
 
 struct dentry *super_mount(struct file_system_type *fs_type,

@@ -8,7 +8,6 @@
 #include "dir.h"
 #include "file.h"
 #include "super.h"
-#include "bitmap.h"
 #include "aops.h"
 
 
@@ -45,6 +44,7 @@ struct inode *inode_iget(struct super_block *sb, u32 ino)
 	/* Read raw inode block from disk */
 	raw_inode = read_inode(sb, &iloc);
 	if (!raw_inode) {
+		printk(KERN_INFO "testfs: error reading inode number: %d\n", ino);
 		goto err_read_inode;
 	}
 	inode->i_ino = ino;
@@ -60,17 +60,46 @@ err_read_inode:
 }
 
 
+static int get_inode_group(struct super_block *sb, struct inode *inode)
+{
+	struct testfs_inode *testfs_inode = TESTFS_GET_INODE(inode);
+	return testfs_inode->group;
+}
+
+
 struct inode *inode_get_new_inode(struct inode *dir, umode_t mode, int alloc_data_block)
 {
 	int err					= 0;
 	struct inode *new_ino	 		= NULL;
 	int new_inode_num 			= 0;
+	int i, group				= 0;
+	struct buffer_head *bitmap_bh		= NULL;
 	struct testfs_inode *testfs_inode	= NULL;
+	struct testfs_group_desc *desc          = NULL;
+	struct testfs_superblock *testfs_sb     = NULL;
 	struct super_block *sb			= dir->i_sb;
+	struct testfs_info *testfs_i		= TESTFS_GET_SB_INFO(sb);
 
+
+	testfs_sb = testfs_i->sb;
+
+	/*
 	if (bitmap_get_free_inode_num(sb, &new_inode_num) != 0){
 		printk(KERN_INFO "testfs: No more free inodes left!\n");
 		return NULL;
+	}
+	*/
+
+	group = get_inode_group(sb, dir);
+
+	if (group < 0) {
+		printk(KERN_INFO "testfs: invalid group for inode number: %lu\n", dir->i_ino);
+		return ERR_PTR(-ENOSPC);
+	}
+
+	for (i=0;i<testfs_sb->group_count;i++)
+	{
+//		desc = get_group_desc();	
 	}
 
 	new_ino = new_inode(sb);
@@ -167,9 +196,17 @@ static int fill_inode(struct super_block *sb, struct inode *inode, struct testfs
 
 static int fill_iloc_by_inode_num(struct super_block *sb, u32 ino, struct testfs_iloc *iloc)
 {
-	struct testfs_info *testfs_i;
-        testfs_i = (struct testfs_info *)sb->s_fs_info;
-        iloc->block_num = le32_to_cpu(testfs_i->sb->itable) +
+	unsigned long block_group 	= 0;
+	struct testfs_group_desc *desc	= NULL;  
+	struct testfs_info *testfs_i	= TESTFS_GET_SB_INFO(sb);
+
+	block_group = ino / TESTFS_INODES_PER_GROUP(sb);        
+	desc = (struct testfs_group_desc *)testfs_i->group_desc_bh[block_group]->b_data;
+
+	printk(KERN_INFO "testfs: inodes per group: %d\n", TESTFS_INODES_PER_GROUP(sb));
+
+	// TODO: remove itable pointer hardcode
+        iloc->block_num = le32_to_cpu(desc->inode_table) +
                 ((ino * sizeof(struct testfs_inode)) / sb->s_blocksize);
         iloc->offset = (ino * sizeof(struct testfs_inode)) % sb->s_blocksize;
         iloc->ino = ino;
@@ -218,13 +255,14 @@ int inode_write_inode(struct inode *inode, struct writeback_control *wbc)
 
 int inode_alloc_data_block(struct super_block *sb, struct inode *inode)
 {
+	/* TODO
 	struct testfs_inode *testfs_inode = TESTFS_GET_INODE(inode);
 
 	if (bitmap_get_free_data_block_num(sb, &testfs_inode->block_ptr) != 0) {
                 printk(KERN_INFO "testfs: Error allocating data block for new inode!\n");
                 return -ENOSPC;
         }
-
+	*/
 	mark_inode_dirty(inode);
 
 	return 0;
@@ -234,17 +272,18 @@ int inode_alloc_data_block(struct super_block *sb, struct inode *inode)
 int inode_get_data_block_num(struct inode *inode)
 {
 	struct testfs_inode *raw_inode 		= (struct testfs_inode *)inode->i_private;
-	struct testfs_info *testfs_info		= (struct testfs_info *)inode->i_sb->s_fs_info;
-	struct testfs_superblock *sb		= testfs_info->sb;
+	//struct testfs_info *testfs_info	= (struct testfs_info *)inode->i_sb->s_fs_info;
+	//struct testfs_superblock *sb		= testfs_info->sb;
 
 	/*
 	 * we are checking if raw_inode is pointing to a valid data block number
 	 */
+	/* TODO
 	if (raw_inode->block_ptr < (sb->itable + sb->itable_size)) {
 		printk(KERN_INFO "testfs: invalid data block number %d\n ", raw_inode->block_ptr);
 		return -1;
 	}
-
+	*/
 	return raw_inode->block_ptr;
 }
 
