@@ -6,12 +6,15 @@
 #include <string.h>
 #include <math.h>
 
-#define BLK_SIZE 	4096
-#define NUM_INODES	(BLK_SIZE * 8)
-#define ITABLE_SIZE	(NUM_INODES * sizeof(struct testfs_inode))
-#define ITABLE_NUM_BLKS ((int)ceil((double)ITABLE_SIZE / (double)BLK_SIZE))
-#define DATA_BLKS_SIZE	(BLK_SIZE * 8 * BLK_SIZE)
-#define BLK_GRP_SIZE 	((BLK_SIZE * 3) + ITABLE_SIZE + DATA_BLKS_SIZE)
+#define BLK_SIZE 		4096
+#define NUM_INODES		(BLK_SIZE * 8)
+#define ITABLE_SIZE		(NUM_INODES * sizeof(struct testfs_inode))
+#define ITABLE_NUM_BLKS 	(ITABLE_SIZE / BLK_SIZE)
+#define DATA_BLKS_SIZE		(BLK_SIZE * 8 * BLK_SIZE)
+#define BLK_GRP_SIZE 		((BLK_SIZE * 3) + ITABLE_SIZE + DATA_BLKS_SIZE)
+#define BLK_GRP_NUM_BLKS 	(BLK_GRP_SIZE / BLK_SIZE)
+
+
 
 /* Commands :
  * $dd if=/dev/zero of=loopback.img bs=1024 count=204800
@@ -25,11 +28,20 @@ struct testfs_superblock {
 	uint32_t magic;		/* Magic number */
 	uint32_t block_size;	/* Block size */
 	uint32_t block_count;	/* Number of blocks. Max is 32768 blocks */
-	uint32_t itable;	/* Block number of inode table */
-	uint32_t itable_size;	/* Size in blocks of inode table */
-	uint32_t block_bitmap;	/* Location of block usage bitmap */
-	uint32_t inode_bitmap;	/* Location of inode bitmap */
+	uint32_t group_count;	/* Number of block groups  */
+	uint32_t blocks_per_group; /* Number of blocks in group */
+	uint32_t inodes_per_group; /* Number of inodes in group */
+	//uint32_t itable;	/* Block number of inode table */
+	//uint32_t itable_size;	/* Size in blocks of inode table */
+	//uint32_t block_bitmap;	/* Location of block usage bitmap */
+	//uint32_t inode_bitmap;	/* Location of inode bitmap */
 	uint32_t rootdir_inode;	/* Inode number of the root directory */
+};
+
+struct testfs_group_desc {
+	uint32_t block_bitmap;
+	uint32_t inode_bitmap;
+	uint32_t inode_table;
 };
 
 struct testfs_inode {
@@ -74,11 +86,11 @@ int main(int argc, char *argv[])
 
 	for (i=0;i<num_groups;i++) {
 		write_pos = (uint64_t)i * (uint64_t)BLK_GRP_SIZE;
-		if (write_super(i) < 0) {
+		if (write_super(num_groups, write_pos) < 0) {
 			goto err;
 		}
 
-		if (write_group_descriptors(write_pos) < 0) {
+		if (write_group_descriptors(write_pos, i) < 0) {
 			goto err;
 		}
 
@@ -106,17 +118,20 @@ err:
 	exit(EXIT_FAILURE);
 }
 
-int write_super(uint64_t write_pos)
+int write_super(uint32_t num_groups, uint64_t write_pos)
 {
 	struct testfs_superblock sb;
-
-	sb.magic	= 0x1012F4DD;
-	sb.block_size	= BLK_SIZE;
-	sb.block_count	= 0; // not used
-	sb.itable	= 4;
-	sb.itable_size	= ITABLE_NUM_BLKS;	
-	sb.block_bitmap = 2;
-	sb.inode_bitmap = 3;
+	
+	sb.magic		= 0x1012F4DD;
+	sb.block_size		= BLK_SIZE;
+	sb.block_count		= 0; // not used
+	sb.group_count		= num_groups;
+	sb.blocks_per_group 	= (uint32_t)BLK_GRP_NUM_BLKS;
+	sb.inodes_per_group	= (uint32_t)NUM_INODES;
+	//sb.itable	= 4;
+	//sb.itable_size	= ITABLE_NUM_BLKS;	
+	//sb.block_bitmap = 2;
+	//sb.inode_bitmap = 3;
 	sb.rootdir_inode = 1;
 
 	/* Seek to block 0 */
@@ -132,14 +147,23 @@ int write_super(uint64_t write_pos)
 	return 0;
 }
 
-int write_group_descriptors(uint64_t write_pos)
+int write_group_descriptors(uint64_t write_pos, int group)
 {
+	struct testfs_group_desc desc;
+	uint32_t start_pos = group * BLK_GRP_NUM_BLKS;
+
+	desc.block_bitmap = start_pos + 2;
+	desc.inode_bitmap = start_pos + 3;
+	desc.inode_table  = start_pos + 4;
+
 	if (lseek64(fd, write_pos + (uint64_t)(1 * BLK_SIZE), 0) < (uint64_t)0) {
                 perror("Failed to seek to group descriptor table: ");
                 return -1;
         }
 
-        write(fd, 0x00, BLK_SIZE);
+        write(fd, &desc, sizeof(desc));
+	printf("Wrote block group descriptor : %lu bytes\n", sizeof(desc));	
+
 	return 0;
 }
 
