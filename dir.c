@@ -11,21 +11,13 @@
 
 static int add_link(struct inode *parent_inode, struct inode *child_inode, struct dentry *dentry, int type)
 {
-	int data_block_num 			= 0;
 	struct testfs_dir_entry *raw_dentry 	= NULL;
 	struct buffer_head *bh 			= NULL;
 	int free_inode_found			= 0;
-
+	int data_block_num			= TESTFS_GET_INODE(parent_inode)->block_ptr;
+		
+	d_instantiate(dentry, child_inode);
 	
-	//d_instantiate(dentry, parent_inode);		
-	d_instantiate(dentry, child_inode);	
-	
-	data_block_num = inode_get_data_block_num(parent_inode);	
-	if (data_block_num < 4) {
-                printk(KERN_INFO "testfs: mkdir(parent dir): invalid data block number for directory entry %s.\n", dentry->d_name.name);
-                return -EIO;
-        }
-
 	if (!(bh = sb_bread(parent_inode->i_sb, data_block_num))) {
                 printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
                 return -EIO;
@@ -99,17 +91,12 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 		unsigned int flags)
 {
-	int data_block_num 			= inode_get_data_block_num(dir);
 	struct testfs_dir_entry *raw_dentry 	= NULL;
 	struct buffer_head *bh			= NULL;
 	struct inode *found_inode		= NULL;
+	int data_block_num			= TESTFS_GET_INODE(dir)->block_ptr;
 
 	printk(KERN_INFO "testfs: lookup...\n");
-
-	if (data_block_num < 4) {
-		printk(KERN_INFO "testfs: lookup: invalid data block number for directory entry %s. Inode number: %lu\n", dentry->d_name.name, dir->i_ino);
-		return ERR_PTR(-EIO);
-	}
 
 	if (!(bh = sb_bread(dir->i_sb, data_block_num))) {
 		printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
@@ -164,7 +151,6 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	struct inode *new_dir 			= NULL;
 	struct buffer_head *new_dir_bh 		= NULL;
 	struct testfs_dir_entry *raw_dentry 	= NULL;
-	int data_block_num	= 0;
 	int err			= 0;
 	struct testfs_inode *new_testfs_ino 	= NULL;	
 
@@ -185,7 +171,7 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 	
 
 	if (!(new_dir_bh = sb_bread(new_dir->i_sb, new_testfs_ino->block_ptr))) {
-                printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
+                printk(KERN_INFO "testfs: error reading data block number %d from disk\n", new_testfs_ino->block_ptr);
                 return -EIO;
         }
 
@@ -219,16 +205,12 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 
 static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
-	int data_block_num 			= inode_get_data_block_num(dir);
 	struct testfs_dir_entry *raw_dentry 	= NULL;
 	struct buffer_head *bh			= NULL;
 	struct inode *child_dir			= dentry->d_inode;
+	int data_block_num                      = TESTFS_GET_INODE(dir)->block_ptr;
 
-	if (data_block_num < 4) {
-		printk(KERN_INFO "testfs: rmdir: invalid data block number for directory entry %s.\n", dentry->d_name.name);
-		return -EIO;
-	}
-
+	
 	if (!(bh = sb_bread(dir->i_sb, data_block_num))) {
 		printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
 		return -EIO;
@@ -287,9 +269,9 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 	struct buffer_head *bh  		= NULL;
 	struct inode *dir 			= fp->f_dentry->d_inode;
 	struct super_block* sb 			= dir->i_sb;
-	int data_block_num			= 0;
 	int isize				= 0;
 	struct testfs_dir_entry *raw_dentry 	= NULL;
+	int data_block_num                      = TESTFS_GET_INODE(dir)->block_ptr;
 
 	/*
 	 * data block number containing entries for the current directory 
@@ -300,16 +282,7 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 		return 0;
 	}
 
-	data_block_num = inode_get_data_block_num(dir);
-
-	/* something like this should never happen. if the inodes are properly written to disk
-	 * block_ptr will point to a valid data block
-	 */
-	if (data_block_num < 4) {
-		printk(KERN_INFO "testfs: readdir: invalid data block number for directory entry %s.\n", fp->f_dentry->d_name.name);
-		return 0;
-	}
-
+	
         if (!(bh = sb_bread(sb, data_block_num))) {
                 printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
                 return -EIO;
