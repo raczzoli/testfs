@@ -16,6 +16,7 @@ struct testfs_group_desc {
         __le32 block_bitmap;
         __le32 inode_bitmap;
         __le32 inode_table;
+	__le32 first_data_block;
 };
 
 /* Inode memory and on disk locations */
@@ -34,7 +35,6 @@ struct inode *inode_get_new_inode(struct inode *dir, umode_t mode, int alloc_dat
 int inode_alloc_data_block(struct super_block *sb, struct inode *inode);
 int inode_write_inode(struct inode *inode, struct writeback_control *wbc);
 
-int inode_get_data_block_num(struct inode *inode);
 int inode_get_size(struct inode *inode);
 
 #endif /* INODE_H */
