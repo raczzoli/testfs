@@ -23,8 +23,7 @@ static int add_link(struct inode *parent_inode, struct inode *child_inode, struc
                 return -EIO;
         }
 	
-	
-        raw_dentry = (struct testfs_dir_entry *)bh->b_data;
+	raw_dentry = (struct testfs_dir_entry *)bh->b_data;
         for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(parent_inode->i_sb); raw_dentry++) {
 		if (raw_dentry->inode_number == 0) {
 			//we found an empty inode
@@ -60,8 +59,6 @@ static int testfs_create(struct inode *parent_dir, struct dentry *dentry,
 	struct inode *new_ino = NULL;
 	int err = 0;
 
-	printk(KERN_INFO "testfs: create...\n");
-
 	dquot_initialize(parent_dir);
 	
 	new_ino = inode_get_new_inode(parent_dir, mode, 0);
@@ -96,8 +93,6 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 	struct inode *found_inode		= NULL;
 	int data_block_num			= TESTFS_GET_INODE(dir)->block_ptr;
 
-	printk(KERN_INFO "testfs: lookup...\n");
-
 	if (!(bh = sb_bread(dir->i_sb, data_block_num))) {
 		printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
 		return ERR_PTR(-EIO);
@@ -118,6 +113,7 @@ static struct dentry *testfs_lookup(struct inode *dir, struct dentry *dentry,
 		brelse(bh);
 		
 		found_inode = inode_iget(dir->i_sb, le32_to_cpu(raw_dentry->inode_number));
+		
 		d_add(dentry, found_inode);
 		return 0;
 	}
@@ -169,7 +165,6 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 		return err;
 	}
 	
-
 	if (!(new_dir_bh = sb_bread(new_dir->i_sb, new_testfs_ino->block_ptr))) {
                 printk(KERN_INFO "testfs: error reading data block number %d from disk\n", new_testfs_ino->block_ptr);
                 return -EIO;
@@ -194,8 +189,6 @@ static int testfs_mkdir(struct inode *parent_dir, struct dentry *dentry, umode_t
 
 	mark_buffer_dirty(new_dir_bh);
 	mark_inode_dirty(new_dir);
-
-	printk(KERN_INFO "testfs: inode uid: %d, gid: %d\n", new_dir->i_uid, new_dir->i_gid);
 
 	fsync_bdev(parent_dir->i_sb->s_bdev);
 
@@ -282,7 +275,7 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 		return 0;
 	}
 
-	
+	printk(KERN_INFO "testfs: readdir: inode: %lu, data block num: %d\n", dir->i_ino, data_block_num);	
         if (!(bh = sb_bread(sb, data_block_num))) {
                 printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
                 return -EIO;
@@ -296,10 +289,8 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 	raw_dentry = (struct testfs_dir_entry *)bh->b_data;
 
 	while (fp->f_pos < isize) {
-		printk(KERN_INFO "testfs: listing: %s\n", raw_dentry->name);
 		if (raw_dentry->inode_number > 0)
 		{
-			printk(KERN_INFO "testfs: readdir: name: %s, type: %d\n", raw_dentry->name, raw_dentry->type);
 			filldir(dirent, raw_dentry->name, raw_dentry->name_len, fp->f_pos, raw_dentry->inode_number, raw_dentry->type);
 			fp->f_pos += sizeof(struct testfs_dir_entry);
 		}
