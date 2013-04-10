@@ -336,6 +336,7 @@ int inode_alloc_data_block(struct super_block *sb, struct inode *inode)
                 new_data_block_num = find_next_zero_bit((unsigned long *)bitmap_bh->b_data,
                                               TESTFS_INODES_PER_GROUP(sb), new_data_block_num);
 
+		printk(KERN_INFO "testfs: data block num from bitmap: %d, group nr: %d\n", new_data_block_num, group);
                 if (new_data_block_num == TESTFS_INODES_PER_GROUP(sb)) {
                         if (group == (testfs_sb->group_count - 1)) {
                                 group = 0;
@@ -349,11 +350,11 @@ int inode_alloc_data_block(struct super_block *sb, struct inode *inode)
         }	
 	
 block_num_found:
-	printk(KERN_INFO "testfs: allocating new data block: %d\n", new_data_block_num);
-
 	__test_and_set_bit_le(new_data_block_num, bitmap_bh->b_data);
 
 	testfs_inode->block_ptr = new_data_block_num + desc->first_data_block;
+
+	printk(KERN_INFO "testfs: inode: alloc new data block: %d\n", testfs_inode->block_ptr);
 
 	mark_buffer_dirty(bitmap_bh);
 	mark_inode_dirty(inode);
