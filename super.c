@@ -42,7 +42,6 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 		printk(KERN_ERR "testfs: unable to read superblock.\n");
 		goto err;
 	}
-	printk(KERN_INFO "testfs: superblock read successfuly.\n");
 
 	testfs_sb = kmalloc(sizeof(*testfs_sb), GFP_KERNEL);
 	if (!testfs_sb) {
@@ -57,19 +56,7 @@ static int fill_super(struct super_block *sb, void *data, int silent)
 		goto err;
 	}
 	memset(testfs_i, 0x00, sizeof(*testfs_i));
-	/*
-	if (!(testfs_i->block_bmp_bh = sb_bread(sb, testfs_sb->block_bitmap)))
-	{
-		printk(KERN_ERR "testfs: unable to read data block bitmap from disk.\n");
-		goto err;
-	}
 
-	if (!(testfs_i->inode_bmp_bh = sb_bread(sb, testfs_sb->inode_bitmap)))
-	{
-		printk(KERN_ERR "testfs: unable to read inode bitmap from disk.\n");
-		goto err;
-	}
-	*/
 	printk(KERN_INFO "testfs: magic=%d, block_size=%d, groups count=%d, blocks_count=%d\n",
 		testfs_sb->magic, testfs_sb->block_size, testfs_sb->group_count, testfs_sb->block_count);
 
@@ -107,10 +94,8 @@ static int fill_super(struct super_block *sb, void *data, int silent)
                 }
         }
 
-
 	root = inode_iget(sb, TESTFS_ROOT_INODE_NUM);
-	if (!root) 
-	{
+	if (!root) {
 		printk(KERN_ERR "testfs: inode_iget failed in fill_super!\n");
 		goto err;
 	}
