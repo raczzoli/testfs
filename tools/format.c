@@ -42,6 +42,7 @@ struct testfs_group_desc {
 	uint32_t block_bitmap;
 	uint32_t inode_bitmap;
 	uint32_t inode_table;
+	uint32_t first_data_block;
 };
 
 struct testfs_inode {
@@ -94,11 +95,11 @@ int main(int argc, char *argv[])
 			goto err;
 		}
 
-		if (write_block_bitmap(write_pos) < 0) {
+		if (write_block_bitmap(write_pos, i) < 0) {
 			goto err;
 		}
 
-		if (write_inode_bitmap(write_pos) < 0) {
+		if (write_inode_bitmap(write_pos, i) < 0) {
 			goto err;
 		}
 
@@ -106,7 +107,10 @@ int main(int argc, char *argv[])
 			goto err;
 		}
 
-		if (write_root_dir() < 0) {
+		/*
+ 		 * we write the . and .. entries to disk (only for the root inode)
+ 		 */
+		if (i==0 && write_root_dir() < 0) {
 			goto err;
 		}
 	}
@@ -152,9 +156,10 @@ int write_group_descriptors(uint64_t write_pos, int group)
 	struct testfs_group_desc desc;
 	uint32_t start_pos = group * BLK_GRP_NUM_BLKS;
 
-	desc.block_bitmap = start_pos + 2;
-	desc.inode_bitmap = start_pos + 3;
-	desc.inode_table  = start_pos + 4;
+	desc.block_bitmap 	= start_pos + 2;
+	desc.inode_bitmap 	= start_pos + 3;
+	desc.inode_table  	= start_pos + 4;
+	desc.first_data_block 	= start_pos + 4 + ITABLE_NUM_BLKS;
 
 	if (lseek64(fd, write_pos + (uint64_t)(1 * BLK_SIZE), 0) < (uint64_t)0) {
                 perror("Failed to seek to group descriptor table: ");
@@ -167,7 +172,7 @@ int write_group_descriptors(uint64_t write_pos, int group)
 	return 0;
 }
 
-int write_block_bitmap(uint64_t write_pos)
+int write_block_bitmap(uint64_t write_pos, int group)
 {
 	unsigned char bitmap[BLK_SIZE] = {0};
 	int c;
@@ -177,13 +182,9 @@ int write_block_bitmap(uint64_t write_pos)
 		bitmap[c] = 0x00;
 	}
 
-	/* Marking 1st 5 blocks in use by superblock, block bitmap, inode bitmap, itable */
 	
-	/* zoli: If we want to mark the first X bytes as used, becuase of the big/little endian thing
-	 * we need to invert the order of 1s and 0s. So if we want to mark the first 5 blocks as used
-	 * we need to write it as 0xC0 = 11000000 not 0x3 = 00000011
-	 */
-	bitmap[0] = 0xC0;
+	if (group == 0)
+		bitmap[0] = 0x1;
 
 	/* Seek to block 1 */
 	if (lseek64(fd, write_pos + (uint64_t)(2 * BLK_SIZE), 0) < (uint64_t)0) {
@@ -196,7 +197,7 @@ int write_block_bitmap(uint64_t write_pos)
 	printf("Wrote block bitmap : %lu bytes\n", sizeof(bitmap));
 }
 
-int write_inode_bitmap(uint64_t write_pos)
+int write_inode_bitmap(uint64_t write_pos, int group)
 {
 	unsigned char bitmap[BLK_SIZE] = {0};
 	int c;
@@ -206,10 +207,12 @@ int write_inode_bitmap(uint64_t write_pos)
 		bitmap[c] = 0x00;
 	}
 
-	/* Marking 1st 3 inodes in use. The 2nd and 3rd inode is used by the ".",".." entries, 
- 	 * and the the 1st is only marked as used because we don`t want to have inodes with i_ino 0 
- 	 */
-	bitmap[0] = 0xE0;
+	
+	if (group == 0)
+		bitmap[0] = 0x3;
+	else
+		bitmap[0] = 0x1;
+
 
 	/* Seek to block 2 */
 	if (lseek64(fd, write_pos + (uint64_t)(3 * BLK_SIZE), 0) < (uint64_t)0) {
@@ -229,7 +232,7 @@ int write_itable(uint64_t write_pos, int group)
 
 	/* Resetting itable with dummy data */
 	for (c = 0; c < NUM_INODES; c++) {
-		if (c == 1) {
+		if (c == 1 && group == 0) {
 			itable[c].i_mode 	= 0x41FF;
 			itable[c].i_size 	= 2 * sizeof(struct testfs_dir_entry);
 			itable[c].group		= 0;
