@@ -11,5 +11,6 @@
 #define TESTFS_GET_SB(s)		((struct testfs_superblock *)TESTFS_GET_SB_INFO(s)->sb)
 
 #define TESTFS_INODES_PER_GROUP(sb)	(TESTFS_GET_SB(sb)->inodes_per_group)
+#define TESTFS_BLOCKS_PER_GROUP(sb)	(TESTFS_GET_SB(sb)->blocks_per_group)
 
 #endif /* TESTFS_H */
