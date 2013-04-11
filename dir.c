@@ -202,7 +202,7 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	struct buffer_head *bh			= NULL;
 	struct inode *child_dir			= dentry->d_inode;
 	int data_block_num                      = TESTFS_GET_INODE(dir)->block_ptr;
-
+	int ret					= 0;
 	
 	if (!(bh = sb_bread(dir->i_sb, data_block_num))) {
 		printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
@@ -213,8 +213,15 @@ static int testfs_rmdir(struct inode *dir, struct dentry *dentry)
 	for ( ; ((char*)raw_dentry) < ((char*)bh->b_data) + TESTFS_GET_BLOCK_SIZE(dir->i_sb); raw_dentry++) {
 		if (strcmp(dentry->d_name.name, raw_dentry->name) == 0) {
 			d_delete(dentry);
-			// TODO: REPLACE WITH ext2_set_bit_atomic
+			
 			//bitmap_free_inode_num(dir->i_sb, raw_dentry->inode_number);
+			ret = inode_delete_inode(child_dir);			
+
+			if (ret) {
+				brelse(bh);
+				return ret;
+			}
+
 			raw_dentry->inode_number = 0;
 			memset(raw_dentry->name,0x00,raw_dentry->name_len);
 			raw_dentry->name_len = 0;
@@ -274,9 +281,8 @@ static int testfs_readdir(struct file * fp, void * dirent, filldir_t filldir)
 	if (fp->f_pos >= isize) {
 		return 0;
 	}
-
-	printk(KERN_INFO "testfs: readdir: inode: %lu, data block num: %d\n", dir->i_ino, data_block_num);	
-        if (!(bh = sb_bread(sb, data_block_num))) {
+        
+	if (!(bh = sb_bread(sb, data_block_num))) {
                 printk(KERN_INFO "testfs: error reading data block number %d from disk\n", data_block_num);
                 return -EIO;
         }
