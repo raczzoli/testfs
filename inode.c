@@ -15,7 +15,6 @@
  * reads the inode from the disk by inode number
  */
 static struct testfs_inode *read_inode(struct super_block *sb, struct testfs_iloc *iloc);
-
 /*
  * fills the inode with data from raw_inode. raw_inode can be read from the disk,
  * or instantiated programatically if the inode is new
@@ -354,8 +353,6 @@ block_num_found:
 
 	testfs_inode->block_ptr = new_data_block_num + desc->first_data_block;
 
-	printk(KERN_INFO "testfs: inode: alloc new data block: %d\n", testfs_inode->block_ptr);
-
 	mark_buffer_dirty(bitmap_bh);
 	mark_inode_dirty(inode);
 	brelse(bitmap_bh);
@@ -367,6 +364,79 @@ fail:
 
 	return err;
 }
+
+
+int inode_delete_inode(struct inode *inode)
+{
+	unsigned long inode_group       = 0;
+        struct testfs_group_desc *desc  = NULL;
+        struct testfs_info *testfs_i    	= TESTFS_GET_SB_INFO(inode->i_sb);
+        struct testfs_inode *testfs_inode 	= TESTFS_GET_INODE(inode);
+	int local_ino                   = 0;
+	struct buffer_head *bitmap_bh	= NULL;
+
+        inode_group     = inode->i_ino / TESTFS_INODES_PER_GROUP(inode->i_sb);
+        local_ino       = inode->i_ino - (inode_group * TESTFS_INODES_PER_GROUP(inode->i_sb));
+
+        desc = (struct testfs_group_desc *)testfs_i->group_desc_bh[inode_group]->b_data;
+
+        if (desc) {
+		if (!(bitmap_bh = sb_bread(inode->i_sb, desc->inode_bitmap))) {
+                        printk(KERN_INFO "testfs: error reading inode bitmap at block: %d\n", desc->inode_bitmap);
+                        return -EIO;
+                }	
+		__test_and_clear_bit_le(local_ino, bitmap_bh);
+
+		if (testfs_inode->block_ptr) {
+			inode_delete_data_block(inode->i_sb, testfs_inode->block_ptr);
+		}
+	}
+
+	mark_inode_dirty(inode);
+	mark_buffer_dirty(bitmap_bh);
+	
+	iput(inode);
+	brelse(bitmap_bh);
+
+	return 0;
+}
+
+
+int inode_delete_data_block(struct super_block *sb, unsigned long block)
+{
+        unsigned long group       	= 0;
+        struct testfs_group_desc *desc  = NULL;
+        struct testfs_info *testfs_i    = TESTFS_GET_SB_INFO(sb);
+
+        int local_block                 = 0;
+	int block_in_bitmap		= 0;
+        struct buffer_head *bitmap_bh   = NULL;
+
+        group     	= block / TESTFS_BLOCKS_PER_GROUP(sb);
+	desc 		= (struct testfs_group_desc *)testfs_i->group_desc_bh[group]->b_data;
+        local_block 	= block - (group * TESTFS_BLOCKS_PER_GROUP(sb));
+	block_in_bitmap = local_block - desc->first_data_block;
+
+        desc = (struct testfs_group_desc *)testfs_i->group_desc_bh[group]->b_data;
+
+        if (desc) {
+                if (!(bitmap_bh = sb_bread(sb, desc->block_bitmap))) {
+                        printk(KERN_INFO "testfs: error reading data bitmap at block: %d\n", desc->block_bitmap);
+                        return -EIO;
+                }
+                __test_and_clear_bit_le(block_in_bitmap, bitmap_bh);
+	}
+
+	printk(KERN_INFO "testfs: delete data block %lu, local: %d\n", block, block_in_bitmap);
+
+        mark_buffer_dirty(bitmap_bh);
+        brelse(bitmap_bh);
+
+        return 0;
+}
+
+
+
 
 
 int inode_get_size(struct inode *inode)

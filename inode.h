@@ -32,6 +32,9 @@ struct inode *inode_iget(struct super_block *sb, u32 ino);
 
 struct inode *inode_get_new_inode(struct inode *dir, umode_t mode, int alloc_data_block);
 
+int inode_delete_inode(struct inode *inode);
+int inode_delete_data_block(struct super_block *sb, unsigned long block);
+
 int inode_alloc_data_block(struct super_block *sb, struct inode *inode);
 int inode_write_inode(struct inode *inode, struct writeback_control *wbc);
 
