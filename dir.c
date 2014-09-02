@@ -42,7 +42,7 @@ static int add_link(struct inode *parent_inode, struct inode *child_inode, struc
 	raw_dentry->name_len	= dentry->d_name.len;
 	memcpy(raw_dentry->name, dentry->d_name.name, dentry->d_name.len);
 
-	((struct testfs_inode *)parent_inode->i_private)->i_size 	+= sizeof(struct testfs_dir_entry);
+	((struct testfs_inode *)parent_inode->i_private)->i_size += sizeof(struct testfs_dir_entry);
 		
 	mark_buffer_dirty(bh);
 	mark_inode_dirty(parent_inode);
